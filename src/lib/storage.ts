@@ -45,4 +45,6 @@ export const KEYS = {
   MEALS: 'fla_meals',
   ANONYMOUS_ID: 'fla_anonymous_user_id',
   ONBOARDING: 'fla_onboarding',
+  ACCOUNTS: 'fla_accounts',
+  ACTIVE_ACCOUNT_ID: 'fla_active_account_id',
 } as const;

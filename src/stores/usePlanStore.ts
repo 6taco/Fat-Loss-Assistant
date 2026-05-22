@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { DayPlan, UserProfile, mockPlan } from '@/lib/mock-data';
+import { DayPlan, UserProfile } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
+import { getScopedKey } from '@/lib/accounts';
 
 interface PlanState {
   plans: DayPlan[];
@@ -12,7 +13,7 @@ interface PlanState {
 }
 
 function getLocalUserId() {
-  return getItem<UserProfile | null>(KEYS.USER, null)?.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id;
 }
 
 export const usePlanStore = create<PlanState>((set, get) => ({
@@ -20,7 +21,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   activePlan: false,
 
   loadPlans: () => {
-    const plans = getItem<DayPlan[]>(KEYS.PLAN, mockPlan);
+    const plans = getItem<DayPlan[]>(getScopedKey(KEYS.PLAN), []);
     set({ plans, activePlan: plans.length > 0 });
 
     const userId = getLocalUserId();
@@ -28,13 +29,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
     void getJson<{ plans: DayPlan[] }>(`/api/day-plans?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.plans?.length) return;
-      setItem(KEYS.PLAN, data.plans);
+      setItem(getScopedKey(KEYS.PLAN), data.plans);
       set({ plans: data.plans, activePlan: true });
     });
   },
 
   setPlans: (plans) => {
-    setItem(KEYS.PLAN, plans);
+    setItem(getScopedKey(KEYS.PLAN), plans);
     set({ plans, activePlan: true });
 
     const userId = getLocalUserId();
@@ -46,7 +47,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       p.date === date ? { ...p, completed: !p.completed } : p,
     );
     const updated = plans.find(plan => plan.date === date);
-    setItem(KEYS.PLAN, plans);
+    setItem(getScopedKey(KEYS.PLAN), plans);
     set({ plans });
 
     const userId = getLocalUserId();

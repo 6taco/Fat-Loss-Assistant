@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { calculateMealCalories, MealLog, mockMealLogs, sumMealMacros, UserProfile } from '@/lib/mock-data';
+import { calculateMealCalories, MealLog, sumMealMacros, UserProfile } from '@/lib/mock-data';
 import { getItem, KEYS, setItem } from '@/lib/storage';
+import { getScopedKey } from '@/lib/accounts';
 
 interface MealState {
   meals: MealLog[];
@@ -14,7 +15,7 @@ interface MealState {
 }
 
 function getLocalUserId() {
-  return getItem<UserProfile | null>(KEYS.USER, null)?.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id;
 }
 
 function sortMeals(meals: MealLog[]) {
@@ -40,7 +41,7 @@ export const useMealStore = create<MealState>((set, get) => ({
   meals: [],
 
   loadMeals: () => {
-    const meals = sortMeals(getItem<MealLog[]>(KEYS.MEALS, mockMealLogs).map(normalizeMeal));
+    const meals = sortMeals(getItem<MealLog[]>(getScopedKey(KEYS.MEALS), []).map(normalizeMeal));
     set({ meals });
 
     const userId = getLocalUserId();
@@ -49,7 +50,7 @@ export const useMealStore = create<MealState>((set, get) => ({
     void getJson<{ meals: MealLog[] }>(`/api/meal-logs?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.meals?.length) return;
       const sorted = sortMeals(data.meals.map(normalizeMeal));
-      setItem(KEYS.MEALS, sorted);
+      setItem(getScopedKey(KEYS.MEALS), sorted);
       set({ meals: sorted });
     });
   },
@@ -57,7 +58,7 @@ export const useMealStore = create<MealState>((set, get) => ({
   addMeal: (meal) => {
     const nextMeal = normalizeMeal(meal);
     const meals = sortMeals([...get().meals, nextMeal]);
-    setItem(KEYS.MEALS, meals);
+    setItem(getScopedKey(KEYS.MEALS), meals);
     set({ meals });
 
     const userId = getLocalUserId();
@@ -67,7 +68,7 @@ export const useMealStore = create<MealState>((set, get) => ({
   updateMeal: (meal) => {
     const nextMeal = normalizeMeal({ ...meal, updatedAt: new Date().toISOString() });
     const meals = sortMeals(get().meals.map(item => item.id === nextMeal.id ? nextMeal : item));
-    setItem(KEYS.MEALS, meals);
+    setItem(getScopedKey(KEYS.MEALS), meals);
     set({ meals });
 
     const userId = getLocalUserId();
@@ -76,7 +77,7 @@ export const useMealStore = create<MealState>((set, get) => ({
 
   deleteMeal: (id) => {
     const meals = get().meals.filter(meal => meal.id !== id);
-    setItem(KEYS.MEALS, meals);
+    setItem(getScopedKey(KEYS.MEALS), meals);
     set({ meals });
 
     const userId = getLocalUserId();

@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { BarChart3, Calendar, ClipboardList, Home, MessageSquare, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -17,7 +19,11 @@ export default function TabBar() {
   const pathname = usePathname();
   const router = useRouter();
 
-  if (pathname === '/' || pathname.startsWith('/onboarding')) return null;
+  useEffect(() => {
+    tabs.forEach(tab => router.prefetch(tab.path));
+  }, [router]);
+
+  if (pathname === '/' || pathname.startsWith('/onboarding') || pathname.startsWith('/accounts')) return null;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 tab-bar-blur">
@@ -26,11 +32,15 @@ export default function TabBar() {
           const active = pathname.startsWith(tab.path);
           const Icon = tab.icon;
           return (
-            <button
+            <Link
               key={tab.id}
-              onClick={() => router.push(tab.path)}
+              href={active ? pathname : tab.path}
+              prefetch
+              onClick={(event) => {
+                if (active) event.preventDefault();
+              }}
               className={cn(
-                'flex flex-col items-center gap-1 min-w-[42px] bg-transparent border-none cursor-pointer transition-colors',
+                'flex flex-col items-center gap-1 min-w-[42px] bg-transparent border-none cursor-pointer transition-all active:scale-95',
                 active ? 'text-accent-blue' : 'text-text-tertiary',
               )}
               aria-label={tab.label}
@@ -41,7 +51,7 @@ export default function TabBar() {
                 className={cn(active && 'drop-shadow-[0_0_6px_rgba(10,132,255,0.5)]')}
               />
               <span className="text-[10px] font-medium leading-none">{tab.label}</span>
-            </button>
+            </Link>
           );
         })}
       </div>

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { UserProfile, WeightEntry, mockWeightLog } from '@/lib/mock-data';
+import { UserProfile, WeightEntry } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
+import { getScopedKey } from '@/lib/accounts';
 
 interface WeightState {
   entries: WeightEntry[];
@@ -10,7 +11,7 @@ interface WeightState {
 }
 
 function getLocalUserId() {
-  return getItem<UserProfile | null>(KEYS.USER, null)?.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id;
 }
 
 function sortEntries(entries: WeightEntry[]) {
@@ -21,7 +22,7 @@ export const useWeightStore = create<WeightState>((set, get) => ({
   entries: [],
 
   loadEntries: () => {
-    const entries = sortEntries(getItem<WeightEntry[]>(KEYS.WEIGHT, mockWeightLog));
+    const entries = sortEntries(getItem<WeightEntry[]>(getScopedKey(KEYS.WEIGHT), []));
     set({ entries });
 
     const userId = getLocalUserId();
@@ -30,7 +31,7 @@ export const useWeightStore = create<WeightState>((set, get) => ({
     void getJson<{ entries: WeightEntry[] }>(`/api/weight-entries?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.entries?.length) return;
       const sorted = sortEntries(data.entries);
-      setItem(KEYS.WEIGHT, sorted);
+      setItem(getScopedKey(KEYS.WEIGHT), sorted);
       set({ entries: sorted });
     });
   },
@@ -41,7 +42,7 @@ export const useWeightStore = create<WeightState>((set, get) => ({
     const updated = sortEntries(existing >= 0
       ? current.map((e, i) => i === existing ? entry : e)
       : [...current, entry]);
-    setItem(KEYS.WEIGHT, updated);
+    setItem(getScopedKey(KEYS.WEIGHT), updated);
     set({ entries: updated });
 
     const userId = getLocalUserId();

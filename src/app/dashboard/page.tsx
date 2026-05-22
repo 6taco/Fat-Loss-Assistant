@@ -9,6 +9,8 @@ import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { clearLocalAppData, downloadLocalAppData } from '@/lib/app-data';
+import { clearActiveAccount, getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
@@ -31,6 +33,7 @@ const carbTip: Record<CarbType, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const activeAccount = getActiveAccount();
   const { user, loadUser } = useUserStore();
   const { plans, loadPlans, toggleComplete } = usePlanStore();
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
@@ -40,11 +43,19 @@ export default function DashboardPage() {
   const [weightValue, setWeightValue] = useState('');
 
   useEffect(() => {
+    if (!activeAccount) {
+      router.replace('/accounts');
+      return;
+    }
+    if (!getItem(getScopedKey(KEYS.USER), null)) {
+      router.replace('/onboarding');
+      return;
+    }
     loadUser();
     loadPlans();
     loadEntries();
     loadMeals();
-  }, [loadUser, loadPlans, loadEntries, loadMeals]);
+  }, [activeAccount, loadUser, loadPlans, loadEntries, loadMeals, router]);
 
   const u = user || mockUser;
   const todayPlan = getTodayPlan(plans);
@@ -253,6 +264,25 @@ export default function DashboardPage() {
             </button>
             <button onClick={() => router.push('/onboarding')} className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer">
               重新填写信息
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings(false);
+                router.push('/accounts');
+              }}
+              className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer"
+            >
+              切换账户
+            </button>
+            <button
+              onClick={() => {
+                clearActiveAccount();
+                showAppToast('已退出当前账户。', 'success');
+                router.push('/accounts');
+              }}
+              className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer"
+            >
+              退出当前账户
             </button>
             <button
               onClick={() => {

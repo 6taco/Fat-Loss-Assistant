@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { ChatMessage, UserProfile, mockChatMessages } from '@/lib/mock-data';
+import { ChatMessage, UserProfile } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
+import { getScopedKey } from '@/lib/accounts';
 
 interface ChatState {
   messages: ChatMessage[];
@@ -12,7 +13,7 @@ interface ChatState {
 }
 
 function getLocalUserId() {
-  return getItem<UserProfile | null>(KEYS.USER, null)?.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -20,7 +21,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isTyping: false,
 
   loadMessages: () => {
-    const messages = getItem<ChatMessage[]>(KEYS.CHAT, mockChatMessages);
+    const messages = getItem<ChatMessage[]>(getScopedKey(KEYS.CHAT), []);
     set({ messages });
 
     const userId = getLocalUserId();
@@ -28,14 +29,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     void getJson<{ messages: ChatMessage[] }>(`/api/chat-messages?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.messages?.length) return;
-      setItem(KEYS.CHAT, data.messages);
+      setItem(getScopedKey(KEYS.CHAT), data.messages);
       set({ messages: data.messages });
     });
   },
 
   addMessage: (msg) => {
     const messages = [...get().messages, msg];
-    setItem(KEYS.CHAT, messages);
+    setItem(getScopedKey(KEYS.CHAT), messages);
     set({ messages });
 
     const userId = getLocalUserId();

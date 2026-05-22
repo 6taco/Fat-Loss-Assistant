@@ -1,8 +1,10 @@
 import { KEYS, getItem, removeItem } from '@/lib/storage';
 import { ChatMessage, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
+import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 
 export interface LocalAppData {
   exportedAt: string;
+  account: ReturnType<typeof getActiveAccount>;
   user: UserProfile | null;
   plans: DayPlan[];
   weightEntries: WeightEntry[];
@@ -13,16 +15,19 @@ export interface LocalAppData {
 export function readLocalAppData(): LocalAppData {
   return {
     exportedAt: new Date().toISOString(),
-    user: getItem<UserProfile | null>(KEYS.USER, null),
-    plans: getItem<DayPlan[]>(KEYS.PLAN, []),
-    weightEntries: getItem<WeightEntry[]>(KEYS.WEIGHT, []),
-    mealLogs: getItem<MealLog[]>(KEYS.MEALS, []),
-    chatMessages: getItem<ChatMessage[]>(KEYS.CHAT, []),
+    account: getActiveAccount(),
+    user: getItem<UserProfile | null>(getScopedKey(KEYS.USER), null),
+    plans: getItem<DayPlan[]>(getScopedKey(KEYS.PLAN), []),
+    weightEntries: getItem<WeightEntry[]>(getScopedKey(KEYS.WEIGHT), []),
+    mealLogs: getItem<MealLog[]>(getScopedKey(KEYS.MEALS), []),
+    chatMessages: getItem<ChatMessage[]>(getScopedKey(KEYS.CHAT), []),
   };
 }
 
 export function clearLocalAppData() {
-  Object.values(KEYS).forEach(removeItem);
+  [KEYS.USER, KEYS.PLAN, KEYS.WEIGHT, KEYS.MEALS, KEYS.CHAT, KEYS.ONBOARDING].forEach(key => {
+    removeItem(getScopedKey(key));
+  });
 }
 
 export function downloadLocalAppData() {

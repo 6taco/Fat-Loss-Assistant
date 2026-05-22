@@ -7,7 +7,7 @@ import { ChevronLeft, Check, Dumbbell, Scale, UserRound } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
-import { getAnonymousUserId } from '@/lib/anonymous-id';
+import { getActiveAccount } from '@/lib/accounts';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
@@ -65,11 +65,11 @@ const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六'
 
 interface FormState {
   gender: 'male' | 'female';
-  age: number;
-  height: number;
-  weight: number;
+  age: string;
+  height: string;
+  weight: string;
   weightMeasuredDate: string;
-  bodyFat: number;
+  bodyFat: string;
   somatotype: Somatotype;
   trainingFrequency: number;
   trainingIntensity: 'low' | 'medium' | 'high';
@@ -78,17 +78,18 @@ interface FormState {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const account = getActiveAccount();
   const { setUser } = useUserStore();
   const { setPlans } = usePlanStore();
   const { loadEntries, addEntry } = useWeightStore();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>({
     gender: 'male',
-    age: 25,
-    height: 175,
-    weight: 72,
+    age: '25',
+    height: '175',
+    weight: '72',
     weightMeasuredDate: today(),
-    bodyFat: 24,
+    bodyFat: '24',
     somatotype: 'mesomorph',
     trainingFrequency: 5,
     trainingIntensity: 'high',
@@ -96,12 +97,23 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
+    if (!account) {
+      router.replace('/accounts');
+      return;
+    }
     loadEntries();
-  }, [loadEntries]);
+  }, [account, loadEntries, router]);
+
+  const numericForm = useMemo(() => ({
+    age: Number.parseInt(form.age, 10),
+    height: Number.parseFloat(form.height),
+    weight: Number.parseFloat(form.weight),
+    bodyFat: Number.parseFloat(form.bodyFat),
+  }), [form.age, form.height, form.weight, form.bodyFat]);
 
   const previewPlans = useMemo(
-    () => generateCarbCyclePlan(today(), form.weight, form.somatotype, form.trainingSchedule).slice(0, 7),
-    [form.weight, form.somatotype, form.trainingSchedule],
+    () => generateCarbCyclePlan(today(), Number.isFinite(numericForm.weight) ? numericForm.weight : 72, form.somatotype, form.trainingSchedule).slice(0, 7),
+    [numericForm.weight, form.somatotype, form.trainingSchedule],
   );
 
   const update = <K extends keyof FormState>(key: K, val: FormState[K]) => {
@@ -121,13 +133,13 @@ export default function OnboardingPage() {
 
   const validateStep = () => {
     if (step === 1) {
-      if (form.age < 14 || form.age > 80) return '年龄需要在 14-80 岁之间。';
-      if (form.height < 120 || form.height > 230) return '身高需要在 120-230 cm 之间。';
-      if (form.weight < 30 || form.weight > 250) return '体重需要在 30-250 kg 之间。';
+      if (!Number.isFinite(numericForm.age) || numericForm.age < 14 || numericForm.age > 80) return '年龄需要在 14-80 岁之间。';
+      if (!Number.isFinite(numericForm.height) || numericForm.height < 120 || numericForm.height > 230) return '身高需要在 120-230 cm 之间。';
+      if (!Number.isFinite(numericForm.weight) || numericForm.weight < 30 || numericForm.weight > 250) return '体重需要在 30-250 kg 之间。';
       if (!form.weightMeasuredDate) return '请选择最近一次测量体重的日期。';
       if (new Date(form.weightMeasuredDate) > new Date()) return '测量日期不能晚于今天。';
     }
-    if (step === 2 && (form.bodyFat < 5 || form.bodyFat > 60)) return '体脂率需要在 5%-60% 之间。';
+    if (step === 2 && (!Number.isFinite(numericForm.bodyFat) || numericForm.bodyFat < 5 || numericForm.bodyFat > 60)) return '体脂率需要在 5%-60% 之间。';
     if (step === 3) {
       const restDays = form.trainingSchedule.filter(day => day.muscleGroup === 'rest').length;
       if (restDays < 1) return '建议至少安排 1 天休息日，低碳日会优先放在休息日。';
@@ -147,26 +159,31 @@ export default function OnboardingPage() {
       return;
     }
 
+    if (!account) {
+      router.push('/accounts');
+      return;
+    }
+
     const user: UserProfile = {
-      id: getAnonymousUserId(),
-      name: 'Alex',
+      id: account.id,
+      name: account.name,
       gender: form.gender,
-      age: form.age,
-      height: form.height,
-      weight: form.weight,
-      bodyFat: form.bodyFat,
+      age: numericForm.age,
+      height: numericForm.height,
+      weight: numericForm.weight,
+      bodyFat: numericForm.bodyFat,
       trainingFrequency: form.trainingFrequency,
       trainingIntensity: form.trainingIntensity,
       startDate: today(),
       initialWeightDate: form.weightMeasuredDate,
-      goalWeight: Math.round(form.weight * 0.9),
+      goalWeight: Math.round(numericForm.weight * 0.9),
       somatotype: form.somatotype,
       trainingSchedule: form.trainingSchedule,
     };
 
     setUser(user);
     setPlans(generateCarbCyclePlan(user.startDate, user.weight, user.somatotype, user.trainingSchedule));
-    addEntry({ date: form.weightMeasuredDate, weight: form.weight });
+    addEntry({ date: form.weightMeasuredDate, weight: numericForm.weight });
     showAppToast('碳循环计划已生成。', 'success');
     router.push('/dashboard');
   };
@@ -236,7 +253,7 @@ export default function OnboardingPage() {
                     <input
                       type="number"
                       value={form[field.key]}
-                      onChange={(event) => update(field.key, Number(event.target.value))}
+                      onChange={(event) => update(field.key, event.target.value)}
                       className="bg-transparent border-none outline-none text-[16px] w-full text-text-primary"
                       min={field.min}
                       max={field.max}
@@ -274,9 +291,9 @@ export default function OnboardingPage() {
                 {bodyFatOptions.map(opt => (
                   <button
                     key={opt.value}
-                    onClick={() => update('bodyFat', opt.value)}
+                    onClick={() => update('bodyFat', String(opt.value))}
                     className={`p-4 rounded-xl border-2 cursor-pointer bg-glass transition-all text-left ${
-                      form.bodyFat === opt.value ? 'border-accent-blue shadow-[0_0_12px_rgba(10,132,255,0.2)]' : 'border-border-glass'
+                      numericForm.bodyFat === opt.value ? 'border-accent-blue shadow-[0_0_12px_rgba(10,132,255,0.2)]' : 'border-border-glass'
                     }`}
                   >
                     <p className="text-[15px] font-semibold">{opt.value}% · {opt.label}</p>
@@ -290,13 +307,13 @@ export default function OnboardingPage() {
                 type="range"
                 min={5}
                 max={45}
-                value={form.bodyFat}
-                onChange={(event) => update('bodyFat', Number(event.target.value))}
+                value={Number.isFinite(numericForm.bodyFat) ? numericForm.bodyFat : 24}
+                onChange={(event) => update('bodyFat', event.target.value)}
                 className="w-full accent-accent-blue mb-1"
               />
               <div className="flex justify-between mb-7">
                 <span className="text-[11px] text-text-tertiary">5%</span>
-                <span className="text-[13px] text-accent-blue font-semibold">{form.bodyFat}%</span>
+                <span className="text-[13px] text-accent-blue font-semibold">{Number.isFinite(numericForm.bodyFat) ? numericForm.bodyFat : 0}%</span>
                 <span className="text-[11px] text-text-tertiary">45%</span>
               </div>
 
@@ -418,7 +435,7 @@ export default function OnboardingPage() {
                   </div>
                   <div>
                     <p className="text-text-tertiary mb-1">当前体重</p>
-                    <p className="font-semibold">{form.weight} kg</p>
+                    <p className="font-semibold">{Number.isFinite(numericForm.weight) ? numericForm.weight : '-'} kg</p>
                   </div>
                   <div>
                     <p className="text-text-tertiary mb-1">训练频率</p>

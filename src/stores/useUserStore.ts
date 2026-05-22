@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { UserProfile, mockUser } from '@/lib/mock-data';
+import { UserProfile } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
+import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 
 interface UserState {
   user: UserProfile | null;
@@ -16,20 +17,26 @@ export const useUserStore = create<UserState>((set) => ({
   isOnboarded: false,
 
   setUser: (user) => {
-    setItem(KEYS.USER, user);
+    setItem(getScopedKey(KEYS.USER), user);
     set({ user, isOnboarded: true });
     void sendJson<{ user: UserProfile }>('/api/users', 'POST', user);
   },
 
   loadUser: () => {
-    const localUser = getItem<UserProfile | null>(KEYS.USER, null);
-    set({ user: localUser || mockUser, isOnboarded: !!localUser });
+    const account = getActiveAccount();
+    if (!account) {
+      set({ user: null, isOnboarded: false });
+      return;
+    }
+
+    const localUser = getItem<UserProfile | null>(getScopedKey(KEYS.USER), null);
+    set({ user: localUser, isOnboarded: !!localUser });
 
     if (!localUser?.id) return;
 
     void getJson<{ user: UserProfile }>(`/api/users?id=${encodeURIComponent(localUser.id)}`).then((data) => {
       if (!data?.user) return;
-      setItem(KEYS.USER, data.user);
+      setItem(getScopedKey(KEYS.USER), data.user);
       set({ user: data.user, isOnboarded: true });
     });
   },

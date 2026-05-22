@@ -4,9 +4,23 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
 import Button from '@/components/ui/Button';
+import { getActiveAccount } from '@/lib/accounts';
+import { UserProfile } from '@/lib/mock-data';
+import { getItem, KEYS } from '@/lib/storage';
 
 export default function LandingPage() {
   const router = useRouter();
+
+  const start = () => {
+    const account = getActiveAccount();
+    if (!account) {
+      router.push('/accounts');
+      return;
+    }
+
+    const user = getItem<UserProfile | null>(`fla:${account.id}:${KEYS.USER}`, null);
+    router.push(user ? '/dashboard' : '/onboarding');
+  };
 
   return (
     <div className="relative flex flex-col items-center justify-center min-h-dvh px-8 overflow-hidden">
@@ -109,14 +123,14 @@ export default function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
         >
-          <Button fullWidth onClick={() => router.push('/onboarding')}>
+          <Button fullWidth onClick={start}>
             开始我的计划
           </Button>
           <p className="text-[13px] text-text-tertiary mt-4">
             已有本地数据？
             <button
               className="text-accent-blue bg-transparent border-none cursor-pointer ml-1"
-              onClick={() => router.push('/dashboard')}
+              onClick={start}
             >
               直接进入
             </button>
