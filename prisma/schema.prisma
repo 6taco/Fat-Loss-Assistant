@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum TrainingIntensity {
+  low
+  medium
+  high
+}
+
+enum CarbType {
+  high
+  mid
+  low
+}
+
+enum ChatRole {
+  user
+  ai
+}
+
+model User {
+  id                String            @id @default(cuid())
+  name              String
+  gender            Gender
+  age               Int
+  height            Float
+  weight            Float
+  bodyFat           Float
+  trainingFrequency Int
+  trainingIntensity TrainingIntensity
+  startDate         DateTime
+  initialWeightDate DateTime?         @db.Date
+  goalWeight        Float
+  somatotype        String            @default("mesomorph")
+  trainingSchedule  Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  dayPlans          DayPlan[]
+  chatMessages      ChatMessage[]
+  weightEntries     WeightEntry[]
+  mealLogs          MealLog[]
+}
+
+model DayPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  carbType  CarbType
+  calories  Int
+  carb      Int
+  protein   Int
+  fat       Int
+  completed Boolean  @default(false)
+  muscleGroup   String?
+  trainingLabel String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String?
+  role      ChatRole
+  content   String   @db.Text
+  cards     Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WeightEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  weight    Float
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model MealLog {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  mealType    String
+  description String   @db.Text
+  items       Json
+  carb        Float
+  protein     Float
+  fat         Float
+  calories    Int?
+  source      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
