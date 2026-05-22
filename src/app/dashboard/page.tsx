@@ -33,7 +33,6 @@ const carbTip: Record<CarbType, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const activeAccount = getActiveAccount();
   const { user, loadUser } = useUserStore();
   const { plans, loadPlans, toggleComplete } = usePlanStore();
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
@@ -43,6 +42,7 @@ export default function DashboardPage() {
   const [weightValue, setWeightValue] = useState('');
 
   useEffect(() => {
+    const activeAccount = getActiveAccount();
     if (!activeAccount) {
       router.replace('/accounts');
       return;
@@ -55,7 +55,7 @@ export default function DashboardPage() {
     loadPlans();
     loadEntries();
     loadMeals();
-  }, [activeAccount, loadUser, loadPlans, loadEntries, loadMeals, router]);
+  }, [loadUser, loadPlans, loadEntries, loadMeals, router]);
 
   const u = user || mockUser;
   const todayPlan = getTodayPlan(plans);

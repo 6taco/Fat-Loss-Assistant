@@ -78,7 +78,6 @@ interface FormState {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const account = getActiveAccount();
   const { setUser } = useUserStore();
   const { setPlans } = usePlanStore();
   const { loadEntries, addEntry } = useWeightStore();
@@ -97,12 +96,13 @@ export default function OnboardingPage() {
   });
 
   useEffect(() => {
+    const account = getActiveAccount();
     if (!account) {
       router.replace('/accounts');
       return;
     }
     loadEntries();
-  }, [account, loadEntries, router]);
+  }, [loadEntries, router]);
 
   const numericForm = useMemo(() => ({
     age: Number.parseInt(form.age, 10),
@@ -159,6 +159,7 @@ export default function OnboardingPage() {
       return;
     }
 
+    const account = getActiveAccount();
     if (!account) {
       router.push('/accounts');
       return;
