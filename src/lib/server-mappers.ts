@@ -10,6 +10,7 @@ import {
   type TrainingDay,
   UserProfile,
   WeightEntry,
+  muscleGroupLabels,
 } from '@/lib/mock-data';
 
 export function toDate(date: string): Date {
@@ -102,21 +103,22 @@ function toTrainingSchedule(value: unknown): TrainingDay[] {
   if (!Array.isArray(value)) return defaultTrainingSchedule;
 
   const schedule = value
-    .map(item => {
+    .map((item, dayIndex) => {
       if (!item || typeof item !== 'object') return null;
-      const source = item as { dayIndex?: unknown; muscleGroup?: unknown; label?: unknown };
-      const dayIndex = typeof source.dayIndex === 'number' ? source.dayIndex : -1;
+      const source = item as { muscleGroup?: unknown; label?: unknown };
       const muscleGroup = toMuscleGroup(source.muscleGroup);
-      if (dayIndex < 0 || dayIndex > 6 || !muscleGroup) return null;
+      if (!muscleGroup) return null;
       return {
         dayIndex,
         muscleGroup,
-        label: typeof source.label === 'string' ? source.label : muscleGroup,
+        label: typeof source.label === 'string' ? source.label : muscleGroupLabels[muscleGroup],
       };
     })
     .filter((item): item is TrainingDay => Boolean(item));
 
-  return schedule.length === 7 ? schedule : defaultTrainingSchedule;
+  const hasTraining = schedule.some(day => day.muscleGroup !== 'rest');
+  const hasRest = schedule.some(day => day.muscleGroup === 'rest');
+  return hasTraining && hasRest ? schedule : defaultTrainingSchedule;
 }
 
 export function weightToResponse(entry: { date: Date; weight: number }): WeightEntry {

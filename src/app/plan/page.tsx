@@ -6,8 +6,6 @@ import GlassCard from '@/components/ui/GlassCard';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { carbColors } from '@/lib/mock-data';
 
-const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-
 export default function PlanPage() {
   const { plans, loadPlans } = usePlanStore();
 
@@ -25,9 +23,9 @@ export default function PlanPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[22px] font-semibold">碳循环方案</h1>
-          <p className="text-[13px] text-text-tertiary mt-1">232 模式 · 28 天周期</p>
+          <p className="text-[13px] text-text-tertiary mt-1">训练循环驱动 · 28 天周期</p>
         </div>
-        <div className="glass-card rounded-full px-3 py-1.5 text-[11px] text-text-secondary">第 1 周</div>
+        <div className="glass-card rounded-full px-3 py-1.5 text-[11px] text-text-secondary">第 1 个 7 天</div>
       </div>
 
       <GlassCard variant="highlight" className="mb-5">
@@ -51,7 +49,7 @@ export default function PlanPage() {
                 >
                   {color.emoji}
                 </div>
-                <span className="text-[10px] text-text-tertiary">{dayLabels[index]}</span>
+                <span className="text-[10px] text-text-tertiary">第{index + 1}天</span>
               </motion.div>
             );
           })}
@@ -60,7 +58,7 @@ export default function PlanPage() {
 
       <GlassCard className="mb-5" padding="p-4">
         <p className="text-[12px] text-text-secondary leading-relaxed">
-          分配规则：高碳日合计占每周碳水 50%、脂肪 15%；中碳日占碳水 35%、脂肪 35%；低碳日占碳水 15%、脂肪 50%。蛋白质每天保持一致。
+          分配规则：从开始日期起每连续 7 天保持 2 高碳、3 中碳、2 低碳。高碳优先匹配背腿等重点训练日，低碳优先匹配休息日，蛋白质每天保持一致。
         </p>
       </GlassCard>
 
@@ -74,7 +72,7 @@ export default function PlanPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color.main, boxShadow: `0 0 8px ${color.main}` }} />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-semibold">{dayLabels[index]} · {color.label}</p>
+                    <p className="text-[15px] font-semibold">第 {index + 1} 天 · {color.label}</p>
                     <p className="text-[12px] text-text-tertiary mt-0.5">
                       {plan.trainingLabel || (plan.carbType === 'low' ? '休息' : '训练')}
                     </p>

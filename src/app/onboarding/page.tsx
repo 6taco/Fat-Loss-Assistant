@@ -12,9 +12,10 @@ import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
 import {
-  defaultTrainingSchedule,
+  buildTrainingCycleByFrequency,
   generateCarbCyclePlan,
   muscleGroupLabels,
+  normalizeTrainingCycle,
   somatotypeLabels,
   type MuscleGroup,
   type Somatotype,
@@ -24,6 +25,16 @@ import {
 
 const TOTAL_STEPS = 4;
 const today = () => new Date().toISOString().slice(0, 10);
+const formatPreviewDate = (date: string) => date.slice(5).replace('-', '/');
+const cycleDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const getCycleDayName = (index: number) => cycleDayNames[index] || `第 ${index + 1} 天`;
+const getCycleSummary = (cycle: TrainingDay[]) => {
+  const normalized = normalizeTrainingCycle(cycle);
+  const trainingDays = normalized.filter(day => day.muscleGroup !== 'rest').length;
+  const firstRestIndex = normalized.findIndex(day => day.muscleGroup === 'rest');
+  const trainingStreak = firstRestIndex > 0 ? firstRestIndex : trainingDays;
+  return `练${trainingStreak}休1 · ${normalized.length} 天一轮`;
+};
 
 const somatotypeOptions: { value: Somatotype; visual: string; desc: string; macros: string }[] = [
   {
@@ -61,7 +72,6 @@ const intensityOptions = [
   { value: 'high', label: '高强度', desc: '大重量或高容量训练' },
 ] as const;
 const muscleOptions: MuscleGroup[] = ['chest', 'back', 'shoulders', 'legs', 'arms', 'core', 'cardio', 'rest'];
-const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
 interface FormState {
   gender: 'male' | 'female';
@@ -92,7 +102,7 @@ export default function OnboardingPage() {
     somatotype: 'mesomorph',
     trainingFrequency: 5,
     trainingIntensity: 'high',
-    trainingSchedule: defaultTrainingSchedule,
+    trainingSchedule: buildTrainingCycleByFrequency(5),
   });
 
   useEffect(() => {
@@ -120,6 +130,14 @@ export default function OnboardingPage() {
     setForm(prev => ({ ...prev, [key]: val }));
   };
 
+  const updateTrainingFrequency = (frequency: number) => {
+    setForm(prev => ({
+      ...prev,
+      trainingFrequency: frequency,
+      trainingSchedule: buildTrainingCycleByFrequency(frequency),
+    }));
+  };
+
   const updateTrainingDay = (dayIndex: number, muscleGroup: MuscleGroup) => {
     setForm(prev => ({
       ...prev,
@@ -141,8 +159,11 @@ export default function OnboardingPage() {
     }
     if (step === 2 && (!Number.isFinite(numericForm.bodyFat) || numericForm.bodyFat < 5 || numericForm.bodyFat > 60)) return '体脂率需要在 5%-60% 之间。';
     if (step === 3) {
-      const restDays = form.trainingSchedule.filter(day => day.muscleGroup === 'rest').length;
-      if (restDays < 1) return '建议至少安排 1 天休息日，低碳日会优先放在休息日。';
+      const normalizedCycle = normalizeTrainingCycle(form.trainingSchedule);
+      const trainingDays = normalizedCycle.filter(day => day.muscleGroup !== 'rest').length;
+      const restDays = normalizedCycle.filter(day => day.muscleGroup === 'rest').length;
+      if (trainingDays < 1) return '训练循环里至少需要 1 天训练。';
+      if (restDays < 1) return '训练循环里至少需要 1 天休息，低碳日会优先放在休息日。';
     }
     return '';
   };
@@ -179,7 +200,7 @@ export default function OnboardingPage() {
       initialWeightDate: form.weightMeasuredDate,
       goalWeight: Math.round(numericForm.weight * 0.9),
       somatotype: form.somatotype,
-      trainingSchedule: form.trainingSchedule,
+      trainingSchedule: normalizeTrainingCycle(form.trainingSchedule),
     };
 
     setUser(user);
@@ -356,21 +377,24 @@ export default function OnboardingPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Dumbbell size={20} className="text-accent-blue" />
-                <h2 className="text-[22px] font-semibold">训练计划</h2>
+                <h2 className="text-[22px] font-semibold">训练循环</h2>
               </div>
-              <p className="text-[14px] text-text-secondary mb-6">练背和练腿优先高碳，休息日优先低碳。</p>
+              <p className="text-[14px] text-text-secondary mb-6">按你的训练循环往后推，背腿优先高碳，休息日优先低碳。</p>
 
-              <label className="text-[13px] text-text-secondary font-medium block mb-3">每周训练频率</label>
+              <label className="text-[13px] text-text-secondary font-medium block mb-3">训练频率</label>
+              <p className="text-[12px] text-text-tertiary leading-relaxed mb-3">
+                选择后会按胸、背、肩、腿、手臂、核心持续轮换，并按节奏插入休息日。
+              </p>
               <div className="flex gap-2 mb-6">
                 {frequencyOptions.map(f => (
                   <button
                     key={f}
-                    onClick={() => update('trainingFrequency', f)}
+                    onClick={() => updateTrainingFrequency(f)}
                     className={`flex-1 h-12 rounded-xl font-semibold border-2 cursor-pointer transition-all ${
                       form.trainingFrequency === f ? 'gradient-accent text-white border-transparent' : 'bg-glass border-border-glass text-text-secondary'
                     }`}
                   >
-                    {f}次
+                    练{f}休1
                   </button>
                 ))}
               </div>
@@ -391,12 +415,18 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
-              <label className="text-[13px] text-text-secondary font-medium block mb-3">7 天训练安排</label>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <label className="text-[13px] text-text-secondary font-medium">训练循环模板</label>
+                <span className="text-[12px] text-accent-blue">{getCycleSummary(form.trainingSchedule)}</span>
+              </div>
+              <p className="text-[12px] text-text-tertiary leading-relaxed mb-3">
+                例如练2休1会生成“胸 / 背 / 休 / 肩 / 腿 / 休 / 手臂 / 核心 / 休”，并从开始日期起不断滚动。
+              </p>
               <div className="flex flex-col gap-3">
                 {form.trainingSchedule.map(day => (
                   <GlassCard key={day.dayIndex} padding="p-3">
                     <div className="flex items-center justify-between gap-3 mb-2">
-                      <span className="text-[13px] font-semibold">{weekDayNames[day.dayIndex]}</span>
+                      <span className="text-[13px] font-semibold">{getCycleDayName(day.dayIndex)}</span>
                       <span className="text-[12px] text-accent-blue">{muscleGroupLabels[day.muscleGroup]}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-2">
@@ -425,7 +455,7 @@ export default function OnboardingPage() {
                 <h2 className="text-[22px] font-semibold">计划预览</h2>
               </div>
               <p className="text-[14px] text-text-secondary mb-6">
-                232 模式：2 天高碳、3 天中碳、2 天低碳，蛋白质每天一致。
+                训练循环驱动：从开始日期滚动训练安排，每连续 7 天保持 2 高碳、3 中碳、2 低碳。
               </p>
 
               <GlassCard variant="highlight" className="mb-4">
@@ -439,8 +469,8 @@ export default function OnboardingPage() {
                     <p className="font-semibold">{Number.isFinite(numericForm.weight) ? numericForm.weight : '-'} kg</p>
                   </div>
                   <div>
-                    <p className="text-text-tertiary mb-1">训练频率</p>
-                    <p className="font-semibold">每周 {form.trainingFrequency} 次</p>
+                    <p className="text-text-tertiary mb-1">训练循环</p>
+                    <p className="font-semibold">{getCycleSummary(form.trainingSchedule)}</p>
                   </div>
                   <div>
                     <p className="text-text-tertiary mb-1">初始体重日期</p>
@@ -454,7 +484,8 @@ export default function OnboardingPage() {
                   <GlassCard key={plan.date} padding="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <p className="text-[14px] font-semibold">{weekDayNames[index]} · {plan.trainingLabel}</p>
+                        <p className="text-[14px] font-semibold">第 {index + 1} 天 · {plan.trainingLabel}</p>
+                        <p className="text-[11px] text-text-tertiary mt-0.5">{formatPreviewDate(plan.date)}</p>
                         <p className="text-[11px] text-text-tertiary">{plan.carbType === 'high' ? '高碳日' : plan.carbType === 'mid' ? '中碳日' : '低碳日'}</p>
                       </div>
                       <p className="text-[13px] font-semibold">{plan.calories} kcal</p>

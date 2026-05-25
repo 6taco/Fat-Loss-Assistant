@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Send } from 'lucide-react';
+import Image from 'next/image';
+import { HeartPulse, Send, Sparkles } from 'lucide-react';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { useChatStore } from '@/stores/useChatStore';
 import { usePlanStore } from '@/stores/usePlanStore';
@@ -40,7 +41,7 @@ const mockAIResponses: Record<string, { content: string; cards?: ChatCard[] }> =
     }],
   },
   default: {
-    content: '我先给你一个稳妥建议：保持今天的目标不变，优先完成蛋白质、饮水和训练/步数。更具体的方案可以结合你的今日计划继续调整。',
+    content: '我听到了，减脂有时候真的会让人很累。今天先别急着把所有事都做好，先完成一个很小的动作：喝点水，吃一份蛋白质，或者出门走 5 分钟。你不是失败，我们先把这一刻稳住。',
   },
 };
 
@@ -122,19 +123,33 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex flex-col h-dvh pt-14 pb-[83px]">
-      <div className="px-5 pb-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center relative">
-          <span className="text-[13px] font-semibold">Z</span>
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-carb-low border-2 border-bg-primary" />
-        </div>
-        <div>
-          <p className="text-[16px] font-semibold">Coach Zero</p>
-          <p className="text-[11px] text-carb-low">在线 · 减脂教练</p>
+    <div className="flex flex-col h-dvh pt-12 pb-[83px] relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-accent-blue/10 blur-3xl" />
+        <div className="absolute top-40 -left-28 w-72 h-72 rounded-full bg-carb-low/10 blur-3xl" />
+      </div>
+
+      <div className="relative z-10 px-5 pb-4">
+        <div className="glass-card-highlight p-4 flex items-center gap-3">
+          <Avatar size="lg" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-[17px] font-semibold">Coach Zero</p>
+              <span className="inline-flex items-center gap-1 rounded-full bg-carb-low/10 border border-carb-low/20 px-2 py-0.5 text-[10px] text-carb-low">
+                <span className="w-1.5 h-1.5 rounded-full bg-carb-low" />
+                在线
+              </span>
+            </div>
+            <p className="text-[12px] text-text-secondary">温柔减脂教练</p>
+            <p className="text-[11px] text-text-tertiary mt-1.5 leading-relaxed">难受的时候也可以来找我，我们先把这一刻稳住。</p>
+          </div>
+          <div className="w-9 h-9 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center shrink-0">
+            <HeartPulse size={16} className="text-accent-blue" />
+          </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 pb-4">
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-5 pb-4">
         <div className="flex flex-col gap-4">
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
@@ -143,45 +158,37 @@ export default function ChatPage() {
           </AnimatePresence>
 
           {isTyping && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2.5 items-start">
               <Avatar />
-              <div className="glass-card rounded-[4px_16px_16px_16px] px-5 py-3 border-l-2 border-l-accent-blue">
-                <div className="flex gap-1 items-center">
-                  {[0, 0.2, 0.4].map((delay, i) => (
-                    <motion.div
-                      key={i}
-                      className="w-1.5 h-1.5 rounded-full bg-accent-blue"
-                      animate={{ opacity: [0.3, 1, 0.3], scale: [0.8, 1, 0.8] }}
-                      transition={{ duration: 1.4, repeat: Infinity, delay }}
-                    />
-                  ))}
-                </div>
+              <div className="rounded-[6px_18px_18px_18px] bg-white/[0.055] border border-white/10 px-4 py-3 shadow-[0_8px_28px_rgba(0,0,0,0.25)]">
+                <p className="text-[11px] text-text-tertiary mb-2">Coach Zero 正在认真听你说</p>
+                <TypingDots />
               </div>
             </motion.div>
           )}
         </div>
       </div>
 
-      <div className="px-5 py-2 flex gap-2 overflow-x-auto">
+      <div className="relative z-10 px-5 py-2 flex gap-2 overflow-x-auto">
         {quickTags.map(tag => (
           <button
             key={tag}
             onClick={() => sendMessage(tag)}
-            className="glass-card rounded-full px-3.5 py-2 text-[12px] text-text-secondary whitespace-nowrap cursor-pointer border-none bg-transparent hover:bg-glass-hover transition-colors"
+            className="rounded-full px-3.5 py-2 text-[12px] text-text-secondary whitespace-nowrap cursor-pointer border border-white/10 bg-white/[0.045] hover:bg-white/[0.08] transition-colors"
           >
             {tag}
           </button>
         ))}
       </div>
 
-      <div className="px-5 pb-2 flex gap-2.5 items-center">
-        <div className="flex-1 glass-card rounded-full px-4 py-3 flex items-center">
+      <div className="relative z-10 px-5 pb-2 flex gap-2.5 items-center">
+        <div className="flex-1 rounded-full px-4 py-3 flex items-center bg-white/[0.06] border border-white/10 shadow-[0_8px_28px_rgba(0,0,0,0.25)]">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
-            placeholder="输入你的问题..."
+            placeholder="说说今天哪里最难..."
             className="w-full bg-transparent border-none outline-none text-[14px] text-text-primary placeholder:text-text-tertiary"
           />
         </div>
@@ -199,28 +206,36 @@ export default function ChatPage() {
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
-      className={`flex ${message.role === 'user' ? 'justify-end' : 'gap-2'}`}
+      className={`flex ${isUser ? 'justify-end' : 'gap-2.5 items-start'}`}
     >
-      {message.role === 'ai' && <Avatar />}
+      {!isUser && <Avatar />}
       <div
-        className={`max-w-[80%] px-4 py-3 ${
-          message.role === 'user'
-            ? 'gradient-accent rounded-[16px_4px_16px_16px]'
-            : 'glass-card rounded-[4px_16px_16px_16px] border-l-2 border-l-accent-blue'
+        className={`max-w-[82%] px-4 py-3 shadow-[0_8px_28px_rgba(0,0,0,0.24)] ${
+          isUser
+            ? 'bg-gradient-to-br from-accent-blue to-accent-purple rounded-[18px_6px_18px_18px] text-white'
+            : 'bg-white/[0.055] border border-white/10 rounded-[6px_18px_18px_18px]'
         }`}
       >
-        <p className={`text-[14px] leading-relaxed ${message.role === 'ai' ? 'text-text-primary' : 'text-white'}`}>
+        {!isUser && (
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sparkles size={12} className="text-accent-blue" />
+            <span className="text-[11px] text-text-tertiary">Coach Zero</span>
+          </div>
+        )}
+        <p className={`text-[14px] leading-relaxed whitespace-pre-wrap break-words ${isUser ? 'text-white' : 'text-text-primary'}`}>
           {message.content}
         </p>
         {message.cards?.map((card, index) => (
           <ChatCardComponent key={index} card={card} />
         ))}
-        <span className={`text-[10px] block mt-2 ${message.role === 'user' ? 'text-white/50 text-right' : 'text-text-tertiary'}`}>
+        <span className={`text-[10px] block mt-2 ${isUser ? 'text-white/55 text-right' : 'text-text-tertiary'}`}>
           {new Date(message.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
@@ -228,24 +243,51 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-function Avatar() {
+function Avatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
+  const dimensions = size === 'lg' ? 'w-14 h-14 rounded-2xl' : 'w-8 h-8 rounded-xl';
+  const imageSize = size === 'lg' ? 56 : 32;
+
   return (
-    <div className="w-7 h-7 rounded-lg gradient-accent flex items-center justify-center flex-shrink-0 mt-1">
-      <span className="text-[10px] font-semibold">Z</span>
+    <div className={`${dimensions} relative overflow-hidden flex-shrink-0 bg-white/10 border border-white/15 shadow-[0_0_24px_rgba(10,132,255,0.18)]`}>
+      <Image
+        src="/images/coach-zero-avatar.png"
+        alt="Coach Zero"
+        width={imageSize}
+        height={imageSize}
+        className="w-full h-full object-cover"
+        priority={size === 'lg'}
+      />
+      <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-carb-low border-2 border-bg-primary" />
+    </div>
+  );
+}
+
+function TypingDots() {
+  return (
+    <div className="flex gap-1 items-center h-4">
+      {[0, 0.2, 0.4].map((delay, i) => (
+        <motion.div
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-accent-blue"
+          animate={{ opacity: [0.25, 1, 0.25], y: [0, -3, 0] }}
+          transition={{ duration: 1.2, repeat: Infinity, delay }}
+        />
+      ))}
     </div>
   );
 }
 
 function ChatCardComponent({ card }: { card: ChatCard }) {
-  const borderColor = card.type === 'food' ? 'rgba(48,209,88,0.2)' : card.type === 'calorie' ? 'rgba(10,132,255,0.2)' : 'rgba(94,92,230,0.2)';
+  const accent = card.type === 'food' ? '#30D158' : card.type === 'calorie' ? '#0A84FF' : '#5E5CE6';
+  const bg = card.type === 'food' ? 'rgba(48,209,88,0.08)' : card.type === 'calorie' ? 'rgba(10,132,255,0.08)' : 'rgba(94,92,230,0.08)';
 
   return (
-    <div className="mt-2.5 rounded-xl p-3" style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${borderColor}` }}>
-      <p className="text-[11px] text-text-tertiary font-medium mb-2">{card.title}</p>
+    <div className="mt-3 rounded-xl p-3 border" style={{ background: bg, borderColor: `${accent}33` }}>
+      <p className="text-[11px] font-semibold mb-2" style={{ color: accent }}>{card.title}</p>
       <div className="flex flex-col gap-2">
         {card.items.map((item, index) => (
-          <div key={index} className="flex items-center justify-between gap-3">
-            <span className="text-[13px]">{item.label}</span>
+          <div key={index} className="flex items-start justify-between gap-3 rounded-lg bg-black/10 px-2.5 py-2">
+            <span className="text-[13px] leading-snug">{item.label}</span>
             <span className="text-[11px] text-text-tertiary text-right">{item.value}</span>
           </div>
         ))}

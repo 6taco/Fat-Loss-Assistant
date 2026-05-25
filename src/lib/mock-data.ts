@@ -116,8 +116,10 @@ export const defaultTrainingSchedule: TrainingDay[] = [
   { dayIndex: 2, muscleGroup: 'rest', label: '休息' },
   { dayIndex: 3, muscleGroup: 'shoulders', label: '练肩' },
   { dayIndex: 4, muscleGroup: 'legs', label: '练腿' },
-  { dayIndex: 5, muscleGroup: 'arms', label: '手臂/核心' },
-  { dayIndex: 6, muscleGroup: 'rest', label: '休息' },
+  { dayIndex: 5, muscleGroup: 'rest', label: '休息' },
+  { dayIndex: 6, muscleGroup: 'arms', label: '手臂' },
+  { dayIndex: 7, muscleGroup: 'core', label: '核心' },
+  { dayIndex: 8, muscleGroup: 'rest', label: '休息' },
 ];
 
 export const mockUser: UserProfile = {
@@ -128,7 +130,7 @@ export const mockUser: UserProfile = {
   height: 175,
   weight: 72,
   bodyFat: 20,
-  trainingFrequency: 5,
+  trainingFrequency: 2,
   trainingIntensity: 'high',
   startDate: '2025-01-01',
   initialWeightDate: '2025-01-01',
@@ -164,20 +166,77 @@ const LOW_PRIORITY: Partial<Record<MuscleGroup, number>> = {
   legs: 8,
 };
 
-function normalizeTrainingSchedule(schedule?: TrainingDay[]): TrainingDay[] {
-  const input = schedule?.length ? schedule : defaultTrainingSchedule;
-  return Array.from({ length: 7 }, (_, dayIndex) => {
-    const day = input.find(item => item.dayIndex === dayIndex) || defaultTrainingSchedule[dayIndex];
-    const label = day.label || muscleGroupLabels[day.muscleGroup] || '训练';
-    return { dayIndex, muscleGroup: day.muscleGroup, label };
-  });
+const DEFAULT_MUSCLE_ROTATION: MuscleGroup[] = ['chest', 'back', 'shoulders', 'legs', 'arms', 'core'];
+
+export function buildTrainingCycleByFrequency(frequency: number): TrainingDay[] {
+  const trainingStreak = Math.max(1, Math.min(6, Math.round(frequency) || 3));
+  const trainingDaysPerCycle = lcm(DEFAULT_MUSCLE_ROTATION.length, trainingStreak);
+  const days: TrainingDay[] = [];
+
+  for (let trainingIndex = 0; trainingIndex < trainingDaysPerCycle; trainingIndex++) {
+    const muscleGroup = DEFAULT_MUSCLE_ROTATION[trainingIndex % DEFAULT_MUSCLE_ROTATION.length];
+    days.push({
+      dayIndex: days.length,
+      muscleGroup,
+      label: muscleGroupLabels[muscleGroup],
+    });
+
+    if ((trainingIndex + 1) % trainingStreak === 0) {
+      days.push({
+        dayIndex: days.length,
+        muscleGroup: 'rest',
+        label: muscleGroupLabels.rest,
+      });
+    }
+  }
+
+  return days;
 }
 
-function pickWeeklyCarbTypes(schedule: TrainingDay[]): CarbType[] {
-  const carbTypes: CarbType[] = Array.from({ length: 7 }, () => 'mid' as CarbType);
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+function lcm(a: number, b: number): number {
+  return Math.abs(a * b) / gcd(a, b);
+}
+
+export function normalizeTrainingCycle(cycle?: TrainingDay[]): TrainingDay[] {
+  if (!Array.isArray(cycle) || cycle.length === 0) return defaultTrainingSchedule;
+
+  const normalized = cycle
+    .map((day, dayIndex) => {
+      const muscleGroup = day?.muscleGroup;
+      if (!muscleGroup || !(muscleGroup in muscleGroupLabels)) return null;
+      return {
+        dayIndex,
+        muscleGroup,
+        label: day.label || muscleGroupLabels[muscleGroup],
+      };
+    })
+    .filter((day): day is TrainingDay => Boolean(day));
+
+  const hasTraining = normalized.some(day => day.muscleGroup !== 'rest');
+  const hasRest = normalized.some(day => day.muscleGroup === 'rest');
+  return hasTraining && hasRest ? normalized : defaultTrainingSchedule;
+}
+
+export function getTrainingDayForDateOffset(cycle: TrainingDay[], offset: number): TrainingDay {
+  const normalizedCycle = normalizeTrainingCycle(cycle);
+  const cycleIndex = offset % normalizedCycle.length;
+  const day = normalizedCycle[cycleIndex];
+  return {
+    dayIndex: offset,
+    muscleGroup: day.muscleGroup,
+    label: day.label,
+  };
+}
+
+export function pickCarbTypesForSevenDayBlock(blockTrainingDays: TrainingDay[]): CarbType[] {
+  const carbTypes: CarbType[] = Array.from({ length: blockTrainingDays.length }, () => 'mid' as CarbType);
   const used = new Set<number>();
 
-  const highCandidates = schedule
+  const highCandidates = blockTrainingDays
     .filter(day => day.muscleGroup === 'legs' || day.muscleGroup === 'back')
     .sort((a, b) => (HIGH_PRIORITY[a.muscleGroup] || 99) - (HIGH_PRIORITY[b.muscleGroup] || 99) || a.dayIndex - b.dayIndex);
 
@@ -187,7 +246,7 @@ function pickWeeklyCarbTypes(schedule: TrainingDay[]): CarbType[] {
   }
 
   if (used.size < 2) {
-    const fallbackHigh = schedule
+    const fallbackHigh = blockTrainingDays
       .filter(day => !used.has(day.dayIndex) && day.muscleGroup !== 'rest')
       .sort((a, b) => (HIGH_PRIORITY[a.muscleGroup] || 99) - (HIGH_PRIORITY[b.muscleGroup] || 99) || a.dayIndex - b.dayIndex);
 
@@ -197,7 +256,18 @@ function pickWeeklyCarbTypes(schedule: TrainingDay[]): CarbType[] {
     }
   }
 
-  const lowDays = schedule
+  if (used.size < 2) {
+    const remainingHigh = blockTrainingDays
+      .filter(day => !used.has(day.dayIndex))
+      .sort((a, b) => (HIGH_PRIORITY[a.muscleGroup] || 99) - (HIGH_PRIORITY[b.muscleGroup] || 99) || a.dayIndex - b.dayIndex);
+
+    for (const day of remainingHigh.slice(0, 2 - used.size)) {
+      carbTypes[day.dayIndex] = 'high';
+      used.add(day.dayIndex);
+    }
+  }
+
+  const lowDays = blockTrainingDays
     .filter(day => !used.has(day.dayIndex))
     .sort((a, b) => (LOW_PRIORITY[a.muscleGroup] || 99) - (LOW_PRIORITY[b.muscleGroup] || 99) || b.dayIndex - a.dayIndex)
     .slice(0, 2);
@@ -218,8 +288,7 @@ export function generateCarbCyclePlan(
 ): DayPlan[] {
   const plans: DayPlan[] = [];
   const start = new Date(startDate);
-  const schedule = normalizeTrainingSchedule(trainingSchedule);
-  const weeklyTypes = pickWeeklyCarbTypes(schedule);
+  const cycle = normalizeTrainingCycle(trainingSchedule);
   const perKg = MACROS_PER_KG_BY_SOMATOTYPE[somatotype] || MACROS_PER_KG_BY_SOMATOTYPE.mesomorph;
   const weeklyCarb = weightKg * perKg.carb * 7;
   const weeklyFat = weightKg * perKg.fat * 7;
@@ -230,28 +299,36 @@ export function generateCarbCyclePlan(
     low: { carb: weeklyCarb * 0.15 / 2, fat: weeklyFat * 0.5 / 2 },
   };
 
-  for (let i = 0; i < 28; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    const weekDay = i % 7;
-    const carbType = weeklyTypes[weekDay];
-    const trainingDay = schedule[weekDay];
-    const carb = Math.round(macroByType[carbType].carb);
-    const protein = Math.round(dailyProtein);
-    const fat = Math.round(macroByType[carbType].fat);
-    const calories = carb * 4 + protein * 4 + fat * 9;
+  for (let blockStart = 0; blockStart < 28; blockStart += 7) {
+    const blockTrainingDays = Array.from({ length: 7 }, (_, blockOffset) => ({
+      ...getTrainingDayForDateOffset(cycle, blockStart + blockOffset),
+      dayIndex: blockOffset,
+    }));
+    const blockCarbTypes = pickCarbTypesForSevenDayBlock(blockTrainingDays);
 
-    plans.push({
-      date: d.toISOString().slice(0, 10),
-      carbType,
-      calories,
-      carb,
-      protein,
-      fat,
-      completed: false,
-      muscleGroup: trainingDay.muscleGroup,
-      trainingLabel: trainingDay.label,
-    });
+    for (let blockOffset = 0; blockOffset < 7; blockOffset++) {
+      const dayOffset = blockStart + blockOffset;
+      const d = new Date(start);
+      d.setDate(d.getDate() + dayOffset);
+      const carbType = blockCarbTypes[blockOffset];
+      const trainingDay = blockTrainingDays[blockOffset];
+      const carb = Math.round(macroByType[carbType].carb);
+      const protein = Math.round(dailyProtein);
+      const fat = Math.round(macroByType[carbType].fat);
+      const calories = carb * 4 + protein * 4 + fat * 9;
+
+      plans.push({
+        date: d.toISOString().slice(0, 10),
+        carbType,
+        calories,
+        carb,
+        protein,
+        fat,
+        completed: false,
+        muscleGroup: trainingDay.muscleGroup,
+        trainingLabel: trainingDay.label,
+      });
+    }
   }
 
   return plans;

@@ -7,6 +7,9 @@ DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
 DEEPSEEK_API_KEY="your_deepseek_api_key"
 DEEPSEEK_BASE_URL="https://api.deepseek.com"
 DEEPSEEK_MODEL="deepseek-chat"
+DEEPSEEK_VISION_API_KEY="your_vision_api_key"
+DEEPSEEK_VISION_BASE_URL="https://your-vision-compatible-endpoint"
+DEEPSEEK_VISION_MODEL="your-vision-model"
 ```
 
 不要提交 `.env.local`。
@@ -36,11 +39,20 @@ npx prisma migrate deploy
 ## DeepSeek
 
 聊天页调用 `POST /api/chat`，饮食估算调用 `POST /api/nutrition-estimate`。
+拍照估算调用 `POST /api/nutrition-estimate/photo`。
 
 `DEEPSEEK_API_KEY` 只在服务端读取，不会暴露给客户端。没有 key 或服务异常时：
 
 - 聊天显示本地降级回复。
 - 饮食估算允许手动填写碳水、蛋白质、脂肪并保存。
+
+拍照估算需要一个兼容 OpenAI Chat Completions 图片消息格式的视觉端点：
+
+- `DEEPSEEK_VISION_API_KEY`：视觉模型 API key；未配置时会回退读取 `DEEPSEEK_API_KEY`。
+- `DEEPSEEK_VISION_BASE_URL`：视觉服务基础地址，例如 `https://example.com/v1`。
+- `DEEPSEEK_VISION_MODEL`：支持图片输入的模型名。
+
+餐食照片只用于当次估算请求，不会保存到 localStorage、数据库或对象存储。
 
 ## PWA 发布
 

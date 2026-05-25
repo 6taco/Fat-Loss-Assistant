@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Pencil, Plus, Trash2, Utensils } from 'lucide-react';
+import { Bot, Camera, Pencil, Plus, RotateCcw, Trash2, Utensils, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
@@ -13,9 +13,11 @@ import { usePlanStore } from '@/stores/usePlanStore';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const maxPhotoSize = 5 * 1024 * 1024;
 
 interface EstimateResponse {
   estimate?: {
+    description?: string;
     items: FoodItem[];
     carb: number;
     protein: number;
@@ -35,18 +37,29 @@ export default function MealsPage() {
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
   const [isEstimating, setIsEstimating] = useState(false);
+  const [isRecognizingPhoto, setIsRecognizingPhoto] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     loadMeals();
     loadPlans();
   }, [loadMeals, loadPlans]);
 
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
   const todayMeals = useMemo(() => meals.filter(meal => meal.date === todayIso), [meals]);
   const summary = useMemo(() => sumMealMacros(todayMeals), [todayMeals]);
   const todayPlan = plans.find(plan => plan.date === todayIso);
   const calories = calculateMealCalories({ carb, protein, fat });
   const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0);
+  const isWorking = isEstimating || isRecognizingPhoto;
 
   const estimate = async () => {
     const text = description.trim();
@@ -83,6 +96,63 @@ export default function MealsPage() {
     }
   };
 
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showAppToast('请选择餐食照片。', 'error');
+      return;
+    }
+    if (file.size > maxPhotoSize) {
+      showAppToast('照片不能超过 5MB，请重新拍摄。', 'error');
+      return;
+    }
+
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setSelectedPhoto(file);
+    setPhotoPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearPhoto = () => {
+    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    setSelectedPhoto(null);
+    setPhotoPreviewUrl(null);
+  };
+
+  const recognizePhoto = async () => {
+    if (!selectedPhoto) {
+      showAppToast('请先拍摄或选择餐食照片。', 'error');
+      return;
+    }
+
+    setIsRecognizingPhoto(true);
+    try {
+      const imageDataUrl = await fileToDataUrl(selectedPhoto);
+      const response = await fetch('/api/nutrition-estimate/photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageDataUrl, mealType }),
+      });
+      const data = (await response.json()) as EstimateResponse;
+      if (!response.ok || !data.estimate) throw new Error(data.error || '照片估算失败');
+
+      if (data.estimate.description) setDescription(data.estimate.description);
+      setItems(data.estimate.items);
+      setCarb(data.estimate.carb);
+      setProtein(data.estimate.protein);
+      setFat(data.estimate.fat);
+      setEditMode(true);
+      showAppToast('照片已生成估算，请确认后保存。', 'success');
+    } catch {
+      setEditMode(true);
+      showAppToast('照片暂时无法估算，请重试或手动填写。', 'error');
+    } finally {
+      setIsRecognizingPhoto(false);
+    }
+  };
+
   const saveMeal = () => {
     if (!canSave) {
       showAppToast('请填写食物描述和至少一项营养素。', 'error');
@@ -110,6 +180,7 @@ export default function MealsPage() {
     setProtein(0);
     setFat(0);
     setEditMode(false);
+    clearPhoto();
     showAppToast('饮食记录已保存。', 'success');
   };
 
@@ -173,12 +244,53 @@ export default function MealsPage() {
           className="w-full min-h-[96px] rounded-xl bg-transparent border border-white/10 px-4 py-3 text-[14px] text-text-primary outline-none focus:border-accent-blue resize-none mb-3"
         />
 
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <Button variant="secondary" fullWidth onClick={estimate} disabled={isEstimating}>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handlePhotoChange}
+          className="hidden"
+        />
+
+        {photoPreviewUrl && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-glass aspect-[4/3]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoPreviewUrl} alt="餐食照片预览" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={clearPhoto}
+                className="absolute right-2 top-2 w-8 h-8 rounded-full bg-black/55 flex items-center justify-center"
+                aria-label="移除照片"
+                disabled={isWorking}
+              >
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking}>
+                <RotateCcw size={16} className="mr-1.5" />
+                重新拍摄
+              </Button>
+              <Button variant="secondary" fullWidth onClick={recognizePhoto} disabled={isWorking}>
+                <Camera size={16} className="mr-1.5" />
+                {isRecognizingPhoto ? '估算中' : '估算照片'}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="px-2 text-[13px]">
+            <Camera size={16} className="mr-1.5" />
+            拍照
+          </Button>
+          <Button variant="secondary" fullWidth onClick={estimate} disabled={isWorking} className="px-2 text-[13px]">
             <Bot size={16} className="mr-1.5" />
             {isEstimating ? '估算中' : 'AI 估算'}
           </Button>
-          <Button variant="secondary" fullWidth onClick={() => setEditMode(true)}>
+          <Button variant="secondary" fullWidth onClick={() => setEditMode(true)} disabled={isWorking} className="px-2 text-[13px]">
             <Pencil size={16} className="mr-1.5" />
             手动填写
           </Button>
@@ -242,6 +354,15 @@ export default function MealsPage() {
       </div>
     </div>
   );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image data'));
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function MacroBox({ label, current, target, color }: { label: string; current: number; target?: number; color: string }) {
