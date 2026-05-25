@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { BarChart3, Calendar, ClipboardList, Home, MessageSquare, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,11 +16,6 @@ const tabs = [
 
 export default function TabBar() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  useEffect(() => {
-    tabs.forEach(tab => router.prefetch(tab.path));
-  }, [router]);
 
   if (pathname === '/' || pathname.startsWith('/onboarding') || pathname.startsWith('/accounts')) return null;
 
@@ -35,7 +29,7 @@ export default function TabBar() {
             <Link
               key={tab.id}
               href={active ? pathname : tab.path}
-              prefetch
+              prefetch={false}
               onClick={(event) => {
                 if (active) event.preventDefault();
               }}

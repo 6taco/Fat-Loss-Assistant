@@ -49,6 +49,9 @@ model User {
   chatMessages      ChatMessage[]
   weightEntries     WeightEntry[]
   mealLogs          MealLog[]
+  dailyReports      DailyReport[]
+  weeklyReports     WeeklyReport[]
+  weightPredictions WeightPrediction[]
 }
 
 model DayPlan {
@@ -112,4 +115,61 @@ model MealLog {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+}
+
+model DailyReport {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @db.Date
+  score       Int
+  summary     String   @db.Text
+  suggestions Json
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model WeeklyReport {
+  id          String   @id @default(cuid())
+  userId      String
+  weekIndex   Int
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  score       Int
+  summary     String   @db.Text
+  suggestions Json
+  metrics     Json
+  risks       Json
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekIndex])
+  @@index([userId])
+}
+
+model WeightPrediction {
+  id                     String   @id @default(cuid())
+  userId                 String
+  generatedAt            DateTime @default(now())
+  currentWeight           Float
+  goalWeight              Float
+  estimatedGoalDate       DateTime? @db.Date
+  estimatedDaysToGoal     Int?
+  goalProbability         Int
+  slopeKgPerDay           Float
+  residualStd             Float
+  plateauStatus           String
+  plateauReason           String   @db.Text
+  calorieDeficitSummary   Json
+  forecast30Days          Json
+  modelVersion            String   @default("linear-regression-v1")
+  createdAt               DateTime @default(now())
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, generatedAt])
 }

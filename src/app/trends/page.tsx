@@ -2,14 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flame, Target, TrendingDown } from 'lucide-react';
+import { Activity, Flame, RefreshCw, Target, TrendingDown } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
+import { useWeightPredictionStore } from '@/stores/useWeightPredictionStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { DayPlan, MealLog, UserProfile, WeightEntry, mockUser, sumMealMacros } from '@/lib/mock-data';
+import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult, mockUser, sumMealMacros } from '@/lib/mock-data';
 
 type RangeKey = '7' | '30' | '90' | 'all';
 type MacroDay = Pick<DayPlan, 'date' | 'calories' | 'carb' | 'protein' | 'fat'>;
@@ -31,6 +32,13 @@ export default function TrendsPage() {
   const { entries: weightEntries, loadEntries } = useWeightStore();
   const { plans, loadPlans } = usePlanStore();
   const { meals, loadMeals } = useMealStore();
+  const {
+    latestPrediction,
+    isLoading: predictionLoading,
+    error: predictionError,
+    loadPredictions,
+    generatePrediction,
+  } = useWeightPredictionStore();
   const u = user || mockUser;
 
   useEffect(() => {
@@ -38,13 +46,14 @@ export default function TrendsPage() {
     loadEntries();
     loadPlans();
     loadMeals();
-  }, [loadUser, loadEntries, loadPlans, loadMeals]);
+    loadPredictions();
+  }, [loadUser, loadEntries, loadPlans, loadMeals, loadPredictions]);
 
   const selectedRange = timeRanges.find(item => item.key === range) || timeRanges[0];
+  const mergedWeightEntries = useMemo(() => mergeInitialWeight(u, weightEntries), [u, weightEntries]);
   const chartData = useMemo(() => {
-    const source = mergeInitialWeight(u, weightEntries);
-    return filterWeightsByRange(source, selectedRange.days);
-  }, [selectedRange.days, u, weightEntries]);
+    return filterWeightsByRange(mergedWeightEntries, selectedRange.days);
+  }, [mergedWeightEntries, selectedRange.days]);
   const actualMacroDays = useMemo(() => getDailyMealMacros(meals), [meals]);
   const macroData = useMemo(() => {
     if (actualMacroDays.length > 0) {
@@ -152,6 +161,15 @@ export default function TrendsPage() {
         </div>
       </GlassCard>
 
+      <WeightPredictionCard
+        prediction={latestPrediction}
+        history={mergedWeightEntries}
+        goalWeight={u.goalWeight}
+        isLoading={predictionLoading}
+        error={predictionError}
+        onGenerate={() => void generatePrediction()}
+      />
+
       <GlassCard className="mb-3">
         <div className="flex items-center justify-between mb-4">
           <p className="text-[13px] font-medium">{hasActualMacroData ? '宏观营养素实际摄入' : '宏观营养素目标参考'}</p>
@@ -230,6 +248,196 @@ function MacroLegend({ color, label }: { color: string; label: string }) {
     <div className="flex items-center justify-center gap-1 rounded-lg bg-glass px-2 py-2">
       <div className={`w-2 h-2 rounded-sm ${color}`} />
       <span className="text-[10px] text-text-tertiary">{label}</span>
+    </div>
+  );
+}
+
+function WeightPredictionCard({
+  prediction,
+  history,
+  goalWeight,
+  isLoading,
+  error,
+  onGenerate,
+}: {
+  prediction: WeightPredictionResult | null;
+  history: WeightEntry[];
+  goalWeight: number;
+  isLoading: boolean;
+  error: string;
+  onGenerate: () => void;
+}) {
+  const canPredict = history.length >= 3;
+  const ready = prediction?.status === 'ready';
+  const statusText = prediction ? getPredictionStatusText(prediction) : '根据体重记录和热量执行，生成未来 30 天趋势。';
+
+  return (
+    <GlassCard className="mb-3 overflow-hidden">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Activity size={14} className="text-accent-blue" />
+            <span className="text-[13px] font-medium">AI 体重预测</span>
+          </div>
+          <p className="text-[11px] text-text-tertiary leading-relaxed">{statusText}</p>
+        </div>
+        <button
+          onClick={onGenerate}
+          disabled={isLoading}
+          className="shrink-0 h-9 px-3 rounded-full border border-white/10 bg-white/[0.06] text-[12px] font-medium text-white/85 disabled:opacity-50"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
+            {isLoading ? '生成中' : '生成预测'}
+          </span>
+        </button>
+      </div>
+
+      {!canPredict && !ready ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-5 text-center">
+          <p className="text-[14px] font-semibold mb-1">还需要更多体重记录</p>
+          <p className="text-[12px] text-text-tertiary">至少 3 条体重记录后，Coach Zero 才会开始推演趋势。</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <PredictionMetric
+              label="预计达标"
+              value={prediction?.estimatedDaysToGoal ? `${prediction.estimatedDaysToGoal}` : '--'}
+              unit={prediction?.estimatedDaysToGoal ? '天' : ''}
+              tone="blue"
+            />
+            <PredictionMetric
+              label="达标概率"
+              value={ready ? `${prediction.goalProbability}` : '--'}
+              unit={ready ? '%' : ''}
+              tone="green"
+            />
+            <PredictionMetric
+              label="平台期"
+              value={ready ? getPlateauShortLabel(prediction.plateau.status) : '--'}
+              unit=""
+              tone={prediction?.plateau.status === 'possible' ? 'yellow' : 'muted'}
+            />
+          </div>
+
+          {ready ? (
+            <>
+              <WeightPredictionChart history={history} prediction={prediction} goalWeight={goalWeight} />
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <p className="text-[10px] text-text-tertiary mb-1">热量执行</p>
+                  <p className="text-[14px] font-semibold">{formatPlanGap(prediction.calorieDeficit.averagePlanGap)}</p>
+                  <p className="text-[10px] text-text-tertiary mt-1">{prediction.calorieDeficit.loggedDays} 天有饮食记录</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
+                  <p className="text-[10px] text-text-tertiary mb-1">趋势斜率</p>
+                  <p className="text-[14px] font-semibold">{prediction.slopeKgPerDay.toFixed(3)} kg/天</p>
+                  <p className="text-[10px] text-text-tertiary mt-1">仅作为趋势参考</p>
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] leading-relaxed text-text-tertiary">{prediction.plateau.reason}</p>
+            </>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4">
+              <p className="text-[12px] text-text-tertiary">
+                {error || prediction?.plateau.reason || '点击生成预测后，会在这里显示未来 30 天曲线。'}
+              </p>
+            </div>
+          )}
+        </>
+      )}
+    </GlassCard>
+  );
+}
+
+function PredictionMetric({
+  label,
+  value,
+  unit,
+  tone,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  tone: 'blue' | 'green' | 'yellow' | 'muted';
+}) {
+  const toneClass = {
+    blue: 'text-accent-blue',
+    green: 'text-carb-low',
+    yellow: 'text-carb-mid',
+    muted: 'text-white/80',
+  }[tone];
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">
+      <p className="text-[10px] text-text-tertiary mb-1">{label}</p>
+      <p className={`text-[18px] font-bold ${toneClass}`}>
+        {value}
+        {unit && <span className="ml-0.5 text-[10px] font-medium text-text-tertiary">{unit}</span>}
+      </p>
+    </div>
+  );
+}
+
+function WeightPredictionChart({
+  history,
+  prediction,
+  goalWeight,
+}: {
+  history: WeightEntry[];
+  prediction: WeightPredictionResult;
+  goalWeight: number;
+}) {
+  const historySlice = history.slice(-14);
+  const chartWidth = Math.max(350, (historySlice.length + prediction.forecast30Days.length) * 16);
+  const values = [
+    ...historySlice.map(entry => entry.weight),
+    ...prediction.forecast30Days.flatMap(point => [point.lowerBound, point.predictedWeight, point.upperBound]),
+    goalWeight,
+  ];
+  const min = Math.min(...values) - 0.3;
+  const max = Math.max(...values) + 0.3;
+  const historyPoints = historySlice.map((entry, index) => ({
+    date: entry.date,
+    x: getPredictionX(index, historySlice.length + prediction.forecast30Days.length, chartWidth),
+    y: mapPredictionWeight(entry.weight, min, max),
+    weight: entry.weight,
+  }));
+  const forecastPoints = prediction.forecast30Days.map((point, index) => ({
+    ...point,
+    x: getPredictionX(historySlice.length + index, historySlice.length + prediction.forecast30Days.length, chartWidth),
+    y: mapPredictionWeight(point.predictedWeight, min, max),
+    lowerY: mapPredictionWeight(point.lowerBound, min, max),
+    upperY: mapPredictionWeight(point.upperBound, min, max),
+  }));
+  const historyPath = pointsToPath(historyPoints);
+  const forecastPath = pointsToPath(forecastPoints);
+  const bandPath = forecastPoints.length
+    ? `${forecastPoints.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.upperY}`).join(' ')} ${[...forecastPoints].reverse().map(point => `L${point.x},${point.lowerY}`).join(' ')} Z`
+    : '';
+  const goalY = mapPredictionWeight(goalWeight, min, max);
+
+  return (
+    <div className="overflow-x-auto pb-1">
+      <svg width={chartWidth} height={154} viewBox={`0 0 ${chartWidth} 154`} className="block">
+        {[plotTop, 44, 74, plotBottom].map(y => (
+          <line key={y} x1="0" y1={y} x2={chartWidth} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+        ))}
+        <line x1="0" y1={goalY} x2={chartWidth} y2={goalY} stroke="rgba(48,209,88,0.5)" strokeDasharray="4 5" strokeWidth="1" />
+        <text x="4" y={Math.max(10, goalY - 5)} fill="rgba(48,209,88,0.8)" fontSize="10">目标 {goalWeight}kg</text>
+        {bandPath && <path d={bandPath} fill="rgba(10,132,255,0.10)" />}
+        {historyPath && <path d={historyPath} fill="none" stroke="#FFFFFF" strokeOpacity="0.72" strokeWidth="2" strokeLinecap="round" />}
+        {forecastPath && <path d={forecastPath} fill="none" stroke="#0A84FF" strokeWidth="2" strokeDasharray="5 6" strokeLinecap="round" />}
+        {historyPoints.map(point => (
+          <circle key={point.date} cx={point.x} cy={point.y} r="3" fill="#FFFFFF" opacity="0.85" />
+        ))}
+        {forecastPoints.filter((_, index) => index % 6 === 5 || index === forecastPoints.length - 1).map(point => (
+          <g key={point.date}>
+            <circle cx={point.x} cy={point.y} r="3" fill="#0A84FF" />
+            <text x={point.x} y={132} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize="10">{formatDate(point.date)}</text>
+          </g>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -328,4 +536,39 @@ function parseDate(date: string): number {
 function formatDate(date: string): string {
   const [, month, day] = date.split('-');
   return `${month}/${day}`;
+}
+
+function getPredictionStatusText(prediction: WeightPredictionResult): string {
+  if (prediction.status === 'insufficient_data') return prediction.plateau.reason;
+  if (prediction.estimatedDaysToGoal && prediction.estimatedGoalDate) {
+    return `按当前记录趋势，预计 ${prediction.estimatedDaysToGoal} 天后接近目标，约 ${formatDate(prediction.estimatedGoalDate)}。`;
+  }
+  return '当前趋势暂不支持预测达标时间，先继续观察 1-2 周。';
+}
+
+function getPlateauShortLabel(status: WeightPredictionResult['plateau']['status']) {
+  if (status === 'possible') return '可能';
+  if (status === 'none') return '未见';
+  return '未知';
+}
+
+function formatPlanGap(gap: number) {
+  if (!gap) return '暂无数据';
+  return gap > 0 ? `低于目标 ${gap} kcal` : `高于目标 ${Math.abs(gap)} kcal`;
+}
+
+function getPredictionX(index: number, count: number, width: number): number {
+  if (count <= 1) return width / 2;
+  const padding = 18;
+  return padding + index * ((width - padding * 2) / (count - 1));
+}
+
+function mapPredictionWeight(w: number, min: number, max: number): number {
+  const range = Math.max(0.1, max - min);
+  const plotHeight = plotBottom - plotTop;
+  return plotBottom - ((w - min) / range) * plotHeight;
+}
+
+function pointsToPath(points: { x: number; y: number }[]): string {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
 }

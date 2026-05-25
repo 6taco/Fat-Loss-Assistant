@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { askDeepSeekVision } from '@/lib/deepseek-vision';
-import { parseNutritionEstimate } from '@/lib/nutrition-estimate';
+import { askDeepSeek } from '@/lib/deepseek';
+import { askGLMFoodVision, getGLMVisionModel } from '@/lib/glm-vision';
+import { parseNutritionEstimate, stringifyNutritionEstimate } from '@/lib/nutrition-estimate';
 
 interface PhotoEstimateBody {
   imageDataUrl?: string;
@@ -26,10 +27,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'image size must be 5MB or less' }, { status: 413 });
     }
 
-    const content = await askDeepSeekVision(imageDataUrl, body.mealType);
-    const parsed = parseNutritionEstimate(content);
+    const glmContent = await askGLMFoodVision(imageDataUrl, body.mealType);
+    const glmEstimate = parseNutritionEstimate(glmContent);
 
-    return NextResponse.json({ estimate: parsed, source: 'ai' });
+    try {
+      const reviewedContent = await askDeepSeek([
+        {
+          role: 'system',
+          content: [
+            '你会收到视觉模型识别出的餐食 JSON。',
+            '请检查营养数据是否合理，修正明显异常值。',
+            '不要添加视觉模型没有识别出的食物。',
+            '只返回最终 JSON，不要 Markdown。',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: stringifyNutritionEstimate(glmEstimate),
+        },
+      ]);
+      const reviewedEstimate = parseNutritionEstimate(reviewedContent);
+      return NextResponse.json({
+        estimate: reviewedEstimate,
+        source: 'ai',
+        provider: 'glm',
+        model: getGLMVisionModel(),
+        reviewProvider: 'deepseek',
+      });
+    } catch {
+      return NextResponse.json({
+        estimate: glmEstimate,
+        source: 'ai',
+        provider: 'glm',
+        model: getGLMVisionModel(),
+        warning: 'DeepSeek review failed; returned GLM estimate',
+      });
+    }
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error), source: 'manual' }, { status: 502 });
   }

@@ -1,5 +1,6 @@
 import {
   ChatMessage,
+  DailyReport,
   DayPlan,
   defaultTrainingSchedule,
   type FoodItem,
@@ -10,8 +11,10 @@ import {
   type TrainingDay,
   UserProfile,
   WeightEntry,
+  WeeklyReport,
   muscleGroupLabels,
 } from '@/lib/mock-data';
+import { weeklyReportRecordToDto } from '@/lib/weekly-report';
 
 export function toDate(date: string): Date {
   return new Date(`${date}T00:00:00`);
@@ -146,6 +149,47 @@ export function chatToResponse(message: {
     timestamp: message.createdAt.toISOString(),
     cards: Array.isArray(message.cards) ? message.cards as ChatMessage['cards'] : undefined,
   };
+}
+
+export function dailyReportToResponse(report: {
+  id: string;
+  userId: string;
+  date: Date;
+  score: number;
+  summary: string;
+  suggestions: unknown;
+  readAt?: Date | null;
+  createdAt: Date;
+}): DailyReport {
+  return {
+    id: report.id,
+    userId: report.userId,
+    date: dateToISODate(report.date),
+    score: Math.max(0, Math.min(100, Math.round(report.score))),
+    summary: report.summary,
+    suggestions: Array.isArray(report.suggestions)
+      ? report.suggestions.filter((item): item is string => typeof item === 'string')
+      : [],
+    readAt: report.readAt?.toISOString(),
+    createdAt: report.createdAt.toISOString(),
+  };
+}
+
+export function weeklyReportToResponse(report: {
+  id: string;
+  userId: string;
+  weekIndex: number;
+  startDate: Date;
+  endDate: Date;
+  score: number;
+  summary: string;
+  suggestions: unknown;
+  metrics: unknown;
+  risks: unknown;
+  readAt: Date | null;
+  createdAt: Date;
+}): WeeklyReport {
+  return weeklyReportRecordToDto(report);
 }
 
 export function mealLogToResponse(meal: {

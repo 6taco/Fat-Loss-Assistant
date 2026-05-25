@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Brain, CheckCircle2, MessageSquare, Scale, Settings, TrendingDown, Utensils } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import jsPDF from 'jspdf';
+import { Brain, CheckCircle2, FileText, Inbox, MessageSquare, Scale, Settings, Share2, TrendingDown, Utensils } from 'lucide-react';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
@@ -13,9 +15,10 @@ import { clearActiveAccount, getActiveAccount, getScopedKey } from '@/lib/accoun
 import { getItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useReportInboxStore } from '@/stores/useReportInboxStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { CarbType, WeightEntry, carbColors, getFatBurnIndex, getTodayPlan, mockUser } from '@/lib/mock-data';
+import { CarbType, DailyReport, WeightEntry, WeeklyReport, carbColors, getFatBurnIndex, getTodayPlan, mockUser } from '@/lib/mock-data';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -37,8 +40,11 @@ export default function DashboardPage() {
   const { plans, loadPlans, toggleComplete } = usePlanStore();
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
   const { loadMeals, getDailySummary } = useMealStore();
+  const { dailyReports, weeklyReports, isLoading: reportsLoading, loadReports, generateWeeklyReport, markRead } = useReportInboxStore();
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<{ type: 'daily'; report: DailyReport } | { type: 'weekly'; report: WeeklyReport } | null>(null);
   const [weightValue, setWeightValue] = useState('');
 
   useEffect(() => {
@@ -55,7 +61,8 @@ export default function DashboardPage() {
     loadPlans();
     loadEntries();
     loadMeals();
-  }, [loadUser, loadPlans, loadEntries, loadMeals, router]);
+    loadReports();
+  }, [loadUser, loadPlans, loadEntries, loadMeals, loadReports, router]);
 
   const u = user || mockUser;
   const todayPlan = getTodayPlan(plans);
@@ -72,6 +79,7 @@ export default function DashboardPage() {
   const maxChartWeight = chartWeights.length ? Math.max(...chartWeights) : u.weight + 1;
   const chartRange = Math.max(0.1, maxChartWeight - minChartWeight);
   const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(u.startDate).getTime()) / 86400000) + 1);
+  const hasUnreadReports = dailyReports.some(report => !report.readAt) || weeklyReports.some(report => !report.readAt);
 
   const saveWeight = () => {
     const weight = Number.parseFloat(weightValue);
@@ -102,13 +110,23 @@ export default function DashboardPage() {
           <h1 className="text-[22px] font-semibold tracking-[-0.2px]">Hi, {u.name}</h1>
           <p className="text-[13px] text-text-tertiary mt-1">今天是你执行计划的第 {dayCount} 天</p>
         </div>
-        <button
-          className="w-9 h-9 glass-card rounded-full flex items-center justify-center"
-          onClick={() => setShowSettings(true)}
-          aria-label="设置"
-        >
-          <Settings size={16} className="text-text-secondary" />
-        </button>
+        <div className="flex gap-2">
+          <button
+            className="relative w-9 h-9 glass-card rounded-full flex items-center justify-center"
+            onClick={() => setShowInbox(true)}
+            aria-label="报告收件箱"
+          >
+            <Inbox size={16} className="text-text-secondary" />
+            {hasUnreadReports && <span className="absolute right-0.5 top-0.5 w-2.5 h-2.5 rounded-full bg-carb-high border border-bg-primary" />}
+          </button>
+          <button
+            className="w-9 h-9 glass-card rounded-full flex items-center justify-center"
+            onClick={() => setShowSettings(true)}
+            aria-label="设置"
+          >
+            <Settings size={16} className="text-text-secondary" />
+          </button>
+        </div>
       </div>
 
       {todayPlan && (
@@ -300,6 +318,215 @@ export default function DashboardPage() {
           </div>
         </ModalBackdrop>
       )}
+
+      {showInbox && (
+        <ReportInboxModal
+          dailyReports={dailyReports}
+          weeklyReports={weeklyReports}
+          isLoading={reportsLoading}
+          selectedReport={selectedReport}
+          onClose={() => {
+            setShowInbox(false);
+            setSelectedReport(null);
+          }}
+          onBack={() => setSelectedReport(null)}
+          onSelect={(item) => {
+            setSelectedReport(item);
+            markRead(item.type, item.report.id);
+          }}
+          onGenerateWeekly={async () => {
+            const report = await generateWeeklyReport(true);
+            if (report) {
+              showAppToast('周报已生成。', 'success');
+              setSelectedReport({ type: 'weekly', report });
+            } else {
+              showAppToast('周报暂时生成失败。', 'error');
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReportInboxModal({
+  dailyReports,
+  weeklyReports,
+  isLoading,
+  selectedReport,
+  onClose,
+  onBack,
+  onSelect,
+  onGenerateWeekly,
+}: {
+  dailyReports: DailyReport[];
+  weeklyReports: WeeklyReport[];
+  isLoading: boolean;
+  selectedReport: { type: 'daily'; report: DailyReport } | { type: 'weekly'; report: WeeklyReport } | null;
+  onClose: () => void;
+  onBack: () => void;
+  onSelect: (item: { type: 'daily'; report: DailyReport } | { type: 'weekly'; report: WeeklyReport }) => void;
+  onGenerateWeekly: () => void;
+}) {
+  return (
+    <ModalBackdrop onClose={onClose} maxWidth="max-w-[390px]">
+      {!selectedReport ? (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-[16px] font-semibold">报告收件箱</p>
+              <p className="text-[11px] text-text-tertiary mt-1">日报与周报都会放在这里</p>
+            </div>
+            <button onClick={onGenerateWeekly} disabled={isLoading} className="rounded-full px-3 py-2 bg-white/[0.06] border border-white/10 text-[12px] text-text-secondary">
+              生成周报
+            </button>
+          </div>
+          <ReportSection title="周报" empty="暂无周报">
+            {weeklyReports.map(report => (
+              <ReportListItem
+                key={report.id}
+                title={`第 ${report.weekIndex} 周 · ${report.score} 分`}
+                subtitle={`${formatDate(report.startDate)} - ${formatDate(report.endDate)}`}
+                summary={report.headline || report.summary}
+                unread={!report.readAt}
+                onClick={() => onSelect({ type: 'weekly', report })}
+              />
+            ))}
+          </ReportSection>
+          <ReportSection title="日报" empty="暂无日报">
+            {dailyReports.map(report => (
+              <ReportListItem
+                key={report.id}
+                title={`${formatDate(report.date)} · ${report.score} 分`}
+                subtitle="每日收盘复盘"
+                summary={report.summary}
+                unread={!report.readAt}
+                onClick={() => onSelect({ type: 'daily', report })}
+              />
+            ))}
+          </ReportSection>
+        </div>
+      ) : selectedReport.type === 'weekly' ? (
+        <WeeklyReportDetail report={selectedReport.report} onBack={onBack} />
+      ) : (
+        <DailyReportDetail report={selectedReport.report} onBack={onBack} />
+      )}
+    </ModalBackdrop>
+  );
+}
+
+function ReportSection({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) {
+  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return (
+    <div className="mb-5">
+      <p className="text-[13px] text-text-secondary font-medium mb-2">{title}</p>
+      <div className="flex flex-col gap-2">
+        {hasChildren ? children : <p className="text-[12px] text-text-tertiary rounded-xl bg-white/[0.04] border border-white/10 px-3 py-3">{empty}</p>}
+      </div>
+    </div>
+  );
+}
+
+function ReportListItem({ title, subtitle, summary, unread, onClick }: { title: string; subtitle: string; summary: string; unread: boolean; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3 py-3 text-left">
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <p className="text-[13px] font-semibold">{title}</p>
+        {unread && <span className="w-2 h-2 rounded-full bg-carb-high shrink-0" />}
+      </div>
+      <p className="text-[11px] text-text-tertiary mb-1">{subtitle}</p>
+      <p className="text-[12px] text-text-secondary line-clamp-2">{summary}</p>
+    </button>
+  );
+}
+
+function WeeklyReportDetail({ report, onBack }: { report: WeeklyReport; onBack: () => void }) {
+  const printableId = `weekly-report-${report.id}`;
+
+  const exportPoster = async () => {
+    const node = document.getElementById(printableId);
+    if (!node) return;
+    const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
+    downloadDataUrl(dataUrl, `fat-loss-weekly-poster-${report.startDate}.png`);
+  };
+
+  const exportPdf = async () => {
+    const node = document.getElementById(printableId);
+    if (!node) return;
+    const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1440] });
+    pdf.addImage(dataUrl, 'PNG', 0, 0, 1080, 1440);
+    pdf.save(`fat-loss-weekly-report-${report.startDate}.pdf`);
+  };
+
+  return (
+    <div>
+      <button onClick={onBack} className="text-[12px] text-accent-blue mb-3">返回收件箱</button>
+      <WeeklyReportPrintableCard report={report} printableId={printableId} />
+      <div className="grid grid-cols-2 gap-2 mt-4">
+        <button onClick={exportPdf} className="rounded-xl py-3 gradient-accent text-white text-[13px] flex items-center justify-center gap-2">
+          <FileText size={14} /> 导出 PDF
+        </button>
+        <button onClick={exportPoster} className="rounded-xl py-3 border border-white/10 bg-white/[0.05] text-text-secondary text-[13px] flex items-center justify-center gap-2">
+          <Share2 size={14} /> 分享海报
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyReportPrintableCard({ report, printableId }: { report: WeeklyReport; printableId: string }) {
+  const m = report.metrics;
+  return (
+    <div id={printableId} className="rounded-2xl bg-[#0A0A0F] border border-white/10 p-5 text-white" style={{ width: 360, minHeight: 480 }}>
+      <p className="text-[12px] text-white/45 mb-1">Fat Loss Assistant</p>
+      <h2 className="text-[22px] font-bold mb-1">AI 减脂周报</h2>
+      <p className="text-[12px] text-white/45 mb-5">{formatDate(report.startDate)} - {formatDate(report.endDate)}</p>
+      <div className="flex items-end justify-between mb-5">
+        <div>
+          <p className="text-[12px] text-white/45 mb-1">本周评分</p>
+          <p className="text-[46px] font-bold text-accent-blue leading-none">{report.score}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[12px] text-white/45 mb-1">本周减重</p>
+          <p className="text-[24px] font-bold">{m.weightChange !== undefined ? `${m.weightChange.toFixed(1)}kg` : '--'}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <PosterMetric label="体重" value={m.startWeight && m.endWeight ? `${m.startWeight} -> ${m.endWeight}kg` : '--'} />
+        <PosterMetric label="平均热量" value={`${m.averageCalories} kcal`} />
+        <PosterMetric label="蛋白达标" value={`${m.proteinHitRate}%`} />
+        <PosterMetric label="连续打卡" value={`${m.longestStreak} 天`} />
+      </div>
+      <p className="text-[15px] leading-relaxed mb-4">{report.headline || report.summary}</p>
+      <p className="text-[13px] text-white/65 leading-relaxed">{report.suggestions[0] || '下周继续保持记录节奏。'}</p>
+      {m.predictionDays && <p className="text-[12px] text-carb-low mt-4">预计 {m.predictionDays} 天后达到目标体重</p>}
+    </div>
+  );
+}
+
+function PosterMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2">
+      <p className="text-[10px] text-white/40 mb-1">{label}</p>
+      <p className="text-[13px] font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function DailyReportDetail({ report, onBack }: { report: DailyReport; onBack: () => void }) {
+  return (
+    <div>
+      <button onClick={onBack} className="text-[12px] text-accent-blue mb-3">返回收件箱</button>
+      <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+        <p className="text-[16px] font-semibold mb-1">{formatDate(report.date)} 日报 · {report.score} 分</p>
+        <p className="text-[13px] text-text-secondary leading-relaxed mt-3">{report.summary}</p>
+        <div className="flex flex-col gap-2 mt-4">
+          {report.suggestions.map((item, index) => (
+            <p key={index} className="rounded-xl bg-black/10 border border-white/10 px-3 py-2 text-[12px] text-text-secondary">{item}</p>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -373,4 +600,18 @@ function IntakeStat({ label, current, target, color }: { label: string; current:
       <p className="text-[10px] text-text-tertiary mt-1">{diff >= 0 ? `剩 ${diff}g` : `超 ${Math.abs(diff)}g`}</p>
     </div>
   );
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
+  const link = document.createElement('a');
+  link.href = dataUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function formatDate(date: string): string {
+  const [, month, day] = date.split('-');
+  return `${month}/${day}`;
 }

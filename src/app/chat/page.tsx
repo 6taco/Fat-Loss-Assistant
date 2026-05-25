@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
-import { HeartPulse, Send, Sparkles } from 'lucide-react';
+import { CalendarCheck, ChevronUp, HeartPulse, RotateCw, Send, Sparkles, X } from 'lucide-react';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { useChatStore } from '@/stores/useChatStore';
+import { useDailyReportStore } from '@/stores/useDailyReportStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { ChatCard, ChatMessage, getTodayPlan } from '@/lib/mock-data';
+import { ChatCard, ChatMessage, DailyReport, getTodayPlan } from '@/lib/mock-data';
 
 const quickTags = ['今天吃什么？', '平台期怎么办？', '可以吃欺骗餐吗？', '帮我调整计划', '加餐建议'];
 
@@ -50,7 +51,9 @@ export default function ChatPage() {
   const { user, loadUser } = useUserStore();
   const { plans, loadPlans } = usePlanStore();
   const { entries: weightEntries, loadEntries } = useWeightStore();
+  const { latestReport, isLoading: isReportLoading, error: reportError, loadReports, ensureLatestReport, generateReport } = useDailyReportStore();
   const [input, setInput] = useState('');
+  const [openPanel, setOpenPanel] = useState<'coach' | 'report' | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,7 +61,13 @@ export default function ChatPage() {
     loadUser();
     loadPlans();
     loadEntries();
-  }, [loadMessages, loadUser, loadPlans, loadEntries]);
+    loadReports();
+  }, [loadMessages, loadUser, loadPlans, loadEntries, loadReports]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    ensureLatestReport();
+  }, [user?.id, ensureLatestReport]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -122,32 +131,28 @@ export default function ChatPage() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    const report = await generateReport(undefined, Boolean(latestReport));
+    const latestError = useDailyReportStore.getState().error;
+    showAppToast(report ? '日报已更新。' : latestError || '日报暂时生成失败，稍后再试。', report ? 'success' : 'error');
+  };
+
   return (
-    <div className="flex flex-col h-dvh pt-12 pb-[83px] relative overflow-hidden">
+    <div className="flex flex-col h-dvh pt-[88px] pb-[83px] relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-accent-blue/10 blur-3xl" />
         <div className="absolute top-40 -left-28 w-72 h-72 rounded-full bg-carb-low/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 px-5 pb-4">
-        <div className="glass-card-highlight p-4 flex items-center gap-3">
-          <Avatar size="lg" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <p className="text-[17px] font-semibold">Coach Zero</p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-carb-low/10 border border-carb-low/20 px-2 py-0.5 text-[10px] text-carb-low">
-                <span className="w-1.5 h-1.5 rounded-full bg-carb-low" />
-                在线
-              </span>
-            </div>
-            <p className="text-[12px] text-text-secondary">温柔减脂教练</p>
-            <p className="text-[11px] text-text-tertiary mt-1.5 leading-relaxed">难受的时候也可以来找我，我们先把这一刻稳住。</p>
-          </div>
-          <div className="w-9 h-9 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center shrink-0">
-            <HeartPulse size={16} className="text-accent-blue" />
-          </div>
-        </div>
-      </div>
+      <TopFloatingPanels
+        openPanel={openPanel}
+        onToggle={(panel) => setOpenPanel(current => current === panel ? null : panel)}
+        onClose={() => setOpenPanel(null)}
+        report={latestReport}
+        isReportLoading={isReportLoading}
+        reportError={reportError}
+        onGenerateReport={handleGenerateReport}
+      />
 
       <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-5 pb-4">
         <div className="flex flex-col gap-4">
@@ -203,6 +208,221 @@ export default function ChatPage() {
       </div>
     </div>
   );
+}
+
+function TopFloatingPanels({
+  openPanel,
+  onToggle,
+  onClose,
+  report,
+  isReportLoading,
+  reportError,
+  onGenerateReport,
+}: {
+  openPanel: 'coach' | 'report' | null;
+  onToggle: (panel: 'coach' | 'report') => void;
+  onClose: () => void;
+  report: DailyReport | null;
+  isReportLoading: boolean;
+  reportError: string;
+  onGenerateReport: () => void;
+}) {
+  return (
+    <div className="absolute top-5 left-0 right-0 z-30 px-5 pointer-events-none">
+      <div className="flex justify-center gap-3">
+        <motion.button
+          type="button"
+          onClick={() => onToggle('coach')}
+          whileTap={{ scale: 0.94 }}
+          className={`pointer-events-auto relative w-14 h-14 rounded-full border backdrop-blur-2xl flex items-center justify-center transition-colors ${
+            openPanel === 'coach'
+              ? 'border-accent-blue/60 bg-accent-blue/10 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_28px_rgba(10,132,255,0.30)]'
+              : 'border-white/15 bg-bg-secondary/85 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_24px_rgba(10,132,255,0.18)]'
+          }`}
+          aria-label={openPanel === 'coach' ? '收起 Coach Zero' : '展开 Coach Zero'}
+        >
+          <Avatar />
+          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-carb-low border-2 border-bg-primary" />
+          <motion.span
+            animate={{ rotate: openPanel === 'coach' ? 180 : 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-blue text-white flex items-center justify-center border border-white/20"
+          >
+            <ChevronUp size={12} />
+          </motion.span>
+        </motion.button>
+
+        <motion.button
+          type="button"
+          onClick={() => onToggle('report')}
+          whileTap={{ scale: 0.94 }}
+          className={`pointer-events-auto relative w-14 h-14 rounded-full border backdrop-blur-2xl flex items-center justify-center transition-colors ${
+            openPanel === 'report'
+              ? 'border-accent-blue/60 bg-accent-blue/10 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_28px_rgba(10,132,255,0.30)]'
+              : 'border-white/15 bg-bg-secondary/85 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_24px_rgba(10,132,255,0.18)]'
+          }`}
+          aria-label={openPanel === 'report' ? '收起 AI 减脂日报' : '展开 AI 减脂日报'}
+        >
+          <CalendarCheck size={20} className="text-accent-blue" />
+          <span className="absolute -bottom-1 -right-1 min-w-6 h-6 rounded-full bg-bg-primary border border-accent-blue/50 px-1 flex items-center justify-center text-[10px] font-semibold text-white">
+            {isReportLoading && !report ? '--' : report?.score ?? 'AI'}
+          </span>
+          <motion.span
+            animate={{ rotate: openPanel === 'report' ? 180 : 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-blue text-white flex items-center justify-center border border-white/20"
+          >
+            <ChevronUp size={12} />
+          </motion.span>
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {openPanel && (
+          <>
+            <motion.button
+              type="button"
+              className="fixed inset-0 z-[-1] bg-black/10 pointer-events-auto"
+              onClick={onClose}
+              aria-label="关闭顶部面板"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -26, scale: 0.96 }}
+              animate={{ opacity: 1, y: 14, scale: 1 }}
+              exit={{ opacity: 0, y: -18, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 28, mass: 0.8 }}
+              className="pointer-events-auto relative mt-1 max-h-[72dvh] overflow-y-auto rounded-[24px] border border-white/12 bg-bg-secondary/90 p-3.5 shadow-[0_24px_70px_rgba(0,0,0,0.55),0_0_32px_rgba(10,132,255,0.12)] backdrop-blur-2xl"
+            >
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="关闭"
+                className="absolute right-6 top-6 z-10 w-8 h-8 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center text-text-secondary active:scale-95 transition-transform"
+              >
+                <X size={15} />
+              </button>
+              {openPanel === 'coach' ? (
+                <CoachHeader />
+              ) : (
+                <DailyReportPanel
+                  report={report}
+                  isLoading={isReportLoading}
+                  error={reportError}
+                  onGenerate={onGenerateReport}
+                />
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function CoachHeader() {
+  return (
+    <div className="glass-card-highlight p-4 flex items-center gap-3 pr-11">
+      <Avatar size="lg" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-[17px] font-semibold">Coach Zero</p>
+          <span className="inline-flex items-center gap-1 rounded-full bg-carb-low/10 border border-carb-low/20 px-2 py-0.5 text-[10px] text-carb-low">
+            <span className="w-1.5 h-1.5 rounded-full bg-carb-low" />
+            在线
+          </span>
+        </div>
+        <p className="text-[12px] text-text-secondary">温柔减脂教练</p>
+        <p className="text-[11px] text-text-tertiary mt-1.5 leading-relaxed">难受的时候也可以来找我，我们先把这一刻稳住。</p>
+      </div>
+      <div className="w-9 h-9 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center shrink-0">
+        <HeartPulse size={16} className="text-accent-blue" />
+      </div>
+    </div>
+  );
+}
+
+function DailyReportPanel({
+  report,
+  isLoading,
+  error,
+  onGenerate,
+}: {
+  report: DailyReport | null;
+  isLoading: boolean;
+  error: string;
+  onGenerate: () => void;
+}) {
+  const dateLabel = report ? formatReportDate(report.date) : '收盘复盘';
+  const score = report?.score ?? 0;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center">
+            <CalendarCheck size={15} className="text-accent-blue" />
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold">AI 减脂日报</p>
+            <p className="text-[11px] text-text-tertiary">{dateLabel}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onGenerate}
+            disabled={isLoading}
+            className="h-8 px-2.5 rounded-full border border-white/10 bg-white/[0.045] text-[11px] text-text-secondary flex items-center gap-1.5 disabled:opacity-50 active:scale-95 transition-transform"
+          >
+            <RotateCw size={12} className={isLoading ? 'animate-spin' : ''} />
+            {report ? '重新生成' : '生成'}
+          </button>
+          <ScoreRing score={score} isLoading={isLoading && !report} />
+        </div>
+      </div>
+
+      {isLoading && !report ? (
+        <p className="text-[13px] text-text-secondary leading-relaxed">Coach Zero 正在整理你的日报...</p>
+      ) : error && !report ? (
+        <p className="text-[13px] text-text-secondary leading-relaxed">{error}</p>
+      ) : report ? (
+        <>
+          <p className="text-[13px] text-text-primary leading-relaxed whitespace-pre-wrap break-words">{report.summary}</p>
+          <div className="grid gap-2 mt-3">
+            {report.suggestions.map((suggestion, index) => (
+              <div key={index} className="rounded-xl border border-white/10 bg-black/10 px-3 py-2">
+                <p className="text-[12px] text-text-secondary leading-snug">{suggestion}</p>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-[13px] text-text-secondary leading-relaxed">记录饮食、体重或打卡后，就可以生成最近一天的温柔复盘。</p>
+      )}
+    </div>
+  );
+}
+
+function ScoreRing({ score, isLoading }: { score: number; isLoading: boolean }) {
+  const clamped = Math.max(0, Math.min(100, score));
+  const background = `conic-gradient(#0A84FF ${clamped * 3.6}deg, rgba(255,255,255,0.10) 0deg)`;
+
+  return (
+    <div className="w-14 h-14 rounded-full p-[3px] shrink-0" style={{ background }}>
+      <div className="w-full h-full rounded-full bg-bg-primary/95 flex flex-col items-center justify-center">
+        <span className="text-[15px] font-semibold leading-none">{isLoading ? '--' : clamped}</span>
+        <span className="text-[9px] text-text-tertiary mt-0.5">分</span>
+      </div>
+    </div>
+  );
+}
+
+function formatReportDate(date: string) {
+  const [, month, day] = date.split('-');
+  return `${Number(month)}月${Number(day)}日 收盘复盘`;
 }
 
 function MessageBubble({ message }: { message: ChatMessage }) {

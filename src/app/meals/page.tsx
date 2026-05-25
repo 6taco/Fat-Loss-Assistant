@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { showAppToast } from '@/components/ui/ToastHost';
-import { calculateMealCalories, FoodItem, MealLog, mealTypeLabels, MealType, sumMealMacros } from '@/lib/mock-data';
+import { calculateMealCalories, type FoodItem, type MealLog, mealTypeLabels, type MealType, sumMealMacros } from '@/lib/mock-data';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 
@@ -23,8 +23,12 @@ interface EstimateResponse {
     protein: number;
     fat: number;
     calories: number;
+    confidence?: number;
+    warnings?: string[];
   };
   error?: string;
+  provider?: string;
+  reviewProvider?: string;
 }
 
 export default function MealsPage() {
@@ -36,8 +40,12 @@ export default function MealsPage() {
   const [carb, setCarb] = useState(0);
   const [protein, setProtein] = useState(0);
   const [fat, setFat] = useState(0);
+  const [calories, setCalories] = useState(0);
+  const [confidence, setConfidence] = useState<number | undefined>();
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [isEstimating, setIsEstimating] = useState(false);
   const [isRecognizingPhoto, setIsRecognizingPhoto] = useState(false);
+  const [recognitionStep, setRecognitionStep] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
@@ -57,9 +65,20 @@ export default function MealsPage() {
   const todayMeals = useMemo(() => meals.filter(meal => meal.date === todayIso), [meals]);
   const summary = useMemo(() => sumMealMacros(todayMeals), [todayMeals]);
   const todayPlan = plans.find(plan => plan.date === todayIso);
-  const calories = calculateMealCalories({ carb, protein, fat });
-  const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0);
+  const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0 || calories > 0);
   const isWorking = isEstimating || isRecognizingPhoto;
+
+  const applyEstimate = (estimate: NonNullable<EstimateResponse['estimate']>) => {
+    if (estimate.description) setDescription(estimate.description);
+    setItems(estimate.items || []);
+    setCarb(estimate.carb);
+    setProtein(estimate.protein);
+    setFat(estimate.fat);
+    setCalories(estimate.calories || calculateMealCalories(estimate));
+    setConfidence(estimate.confidence);
+    setWarnings(estimate.warnings || []);
+    setEditMode(true);
+  };
 
   const estimate = async () => {
     const text = description.trim();
@@ -78,19 +97,11 @@ export default function MealsPage() {
       const data = (await response.json()) as EstimateResponse;
       if (!response.ok || !data.estimate) throw new Error(data.error || 'AI 估算失败');
 
-      setItems(data.estimate.items);
-      setCarb(data.estimate.carb);
-      setProtein(data.estimate.protein);
-      setFat(data.estimate.fat);
-      setEditMode(true);
+      applyEstimate(data.estimate);
       showAppToast('AI 已生成估算，请确认后保存。', 'success');
     } catch {
-      setItems([]);
-      setCarb(0);
-      setProtein(0);
-      setFat(0);
       setEditMode(true);
-      showAppToast('AI 暂时无法估算，请手动填写三大营养。', 'error');
+      showAppToast('AI 暂时无法估算，请手动填写营养数据。', 'error');
     } finally {
       setIsEstimating(false);
     }
@@ -113,12 +124,14 @@ export default function MealsPage() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setSelectedPhoto(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
+    setRecognitionStep('');
   };
 
   const clearPhoto = () => {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setSelectedPhoto(null);
     setPhotoPreviewUrl(null);
+    setRecognitionStep('');
   };
 
   const recognizePhoto = async () => {
@@ -128,8 +141,15 @@ export default function MealsPage() {
     }
 
     setIsRecognizingPhoto(true);
+    setRecognitionStep('正在压缩图片');
     try {
-      const imageDataUrl = await fileToDataUrl(selectedPhoto);
+      const imageDataUrl = await fileToCompressedDataUrl(selectedPhoto);
+      setRecognitionStep('正在识别食物');
+      await pause(250);
+      setRecognitionStep('正在估算重量');
+      await pause(250);
+      setRecognitionStep('正在计算营养');
+
       const response = await fetch('/api/nutrition-estimate/photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,24 +158,43 @@ export default function MealsPage() {
       const data = (await response.json()) as EstimateResponse;
       if (!response.ok || !data.estimate) throw new Error(data.error || '照片估算失败');
 
-      if (data.estimate.description) setDescription(data.estimate.description);
-      setItems(data.estimate.items);
-      setCarb(data.estimate.carb);
-      setProtein(data.estimate.protein);
-      setFat(data.estimate.fat);
-      setEditMode(true);
-      showAppToast('照片已生成估算，请确认后保存。', 'success');
+      applyEstimate(data.estimate);
+      setRecognitionStep('请确认结果');
+      showAppToast(data.reviewProvider ? '照片已识别并复核，请确认后保存。' : '照片已识别，请确认后保存。', 'success');
     } catch {
       setEditMode(true);
-      showAppToast('照片暂时无法估算，请重试或手动填写。', 'error');
+      setRecognitionStep('');
+      showAppToast('照片暂时无法估算，请重拍或手动填写。', 'error');
     } finally {
       setIsRecognizingPhoto(false);
     }
   };
 
+  const updateItem = (index: number, patch: Partial<FoodItem>) => {
+    const nextItems = items.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item);
+    setItems(nextItems);
+    syncTotalsFromItems(nextItems);
+  };
+
+  const syncTotalsFromItems = (nextItems: FoodItem[]) => {
+    const totals = nextItems.reduce(
+      (sum, item) => ({
+        carb: sum.carb + item.carb,
+        protein: sum.protein + item.protein,
+        fat: sum.fat + item.fat,
+        calories: sum.calories + (item.calories ?? calculateMealCalories(item)),
+      }),
+      { carb: 0, protein: 0, fat: 0, calories: 0 },
+    );
+    setCarb(Math.round(totals.carb));
+    setProtein(Math.round(totals.protein));
+    setFat(Math.round(totals.fat));
+    setCalories(Math.round(totals.calories));
+  };
+
   const saveMeal = () => {
     if (!canSave) {
-      showAppToast('请填写食物描述和至少一项营养素。', 'error');
+      showAppToast('请确认食物描述和至少一项营养数据。', 'error');
       return;
     }
 
@@ -168,7 +207,7 @@ export default function MealsPage() {
       carb,
       protein,
       fat,
-      calories,
+      calories: calories || calculateMealCalories({ carb, protein, fat }),
       source: items.length ? 'ai' : 'manual',
       createdAt: new Date().toISOString(),
     };
@@ -179,6 +218,9 @@ export default function MealsPage() {
     setCarb(0);
     setProtein(0);
     setFat(0);
+    setCalories(0);
+    setConfidence(undefined);
+    setWarnings([]);
     setEditMode(false);
     clearPhoto();
     showAppToast('饮食记录已保存。', 'success');
@@ -189,7 +231,7 @@ export default function MealsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-[22px] font-semibold">饮食记录</h1>
-          <p className="text-[13px] text-text-tertiary mt-1">记录每餐摄入，对比今日目标</p>
+          <p className="text-[13px] text-text-tertiary mt-1">拍照估算每餐摄入，对比今日目标</p>
         </div>
         <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center">
           <Utensils size={18} className="text-white" />
@@ -237,13 +279,6 @@ export default function MealsPage() {
           ))}
         </div>
 
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="例如：米饭一碗、鸡胸肉150g、鸡蛋2个"
-          className="w-full min-h-[96px] rounded-xl bg-transparent border border-white/10 px-4 py-3 text-[14px] text-text-primary outline-none focus:border-accent-blue resize-none mb-3"
-        />
-
         <input
           ref={photoInputRef}
           type="file"
@@ -252,34 +287,6 @@ export default function MealsPage() {
           onChange={handlePhotoChange}
           className="hidden"
         />
-
-        {photoPreviewUrl && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-glass aspect-[4/3]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoPreviewUrl} alt="餐食照片预览" className="h-full w-full object-cover" />
-              <button
-                type="button"
-                onClick={clearPhoto}
-                className="absolute right-2 top-2 w-8 h-8 rounded-full bg-black/55 flex items-center justify-center"
-                aria-label="移除照片"
-                disabled={isWorking}
-              >
-                <X size={16} className="text-white" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking}>
-                <RotateCcw size={16} className="mr-1.5" />
-                重新拍摄
-              </Button>
-              <Button variant="secondary" fullWidth onClick={recognizePhoto} disabled={isWorking}>
-                <Camera size={16} className="mr-1.5" />
-                {isRecognizingPhoto ? '估算中' : '估算照片'}
-              </Button>
-            </div>
-          </motion.div>
-        )}
 
         <div className="grid grid-cols-3 gap-3 mb-4">
           <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="px-2 text-[13px]">
@@ -296,32 +303,65 @@ export default function MealsPage() {
           </Button>
         </div>
 
+        {photoPreviewUrl && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
+            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-glass aspect-[4/3]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoPreviewUrl} alt="餐食照片预览" className="h-full w-full object-cover" />
+              <button
+                type="button"
+                onClick={clearPhoto}
+                className="absolute right-2 top-2 w-8 h-8 rounded-full bg-black/55 flex items-center justify-center"
+                aria-label="移除照片"
+                disabled={isWorking}
+              >
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            {recognitionStep && (
+              <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                <p className="text-[12px] text-text-secondary">{recognitionStep}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking}>
+                <RotateCcw size={16} className="mr-1.5" />
+                重新拍摄
+              </Button>
+              <Button variant="secondary" fullWidth onClick={recognizePhoto} disabled={isWorking}>
+                <Camera size={16} className="mr-1.5" />
+                {isRecognizingPhoto ? '识别中' : '拍照估算'}
+              </Button>
+            </div>
+            <p className="text-[11px] text-text-tertiary mt-2">照片只用于本次识别，不会保存。结果是估算，称重会更准确。</p>
+          </motion.div>
+        )}
+
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder="也可以直接输入：米饭半碗、鸡胸肉150g、青菜一份、奶茶半杯"
+          className="w-full min-h-[88px] rounded-xl bg-transparent border border-white/10 px-4 py-3 text-[14px] text-text-primary outline-none focus:border-accent-blue resize-none mb-3"
+        />
+
         {editMode && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
             {items.length > 0 && (
-              <div className="rounded-xl bg-glass p-3 mb-4">
-                <p className="text-[12px] text-text-secondary font-medium mb-2">AI 食物拆分</p>
-                <div className="flex flex-col gap-2">
-                  {items.map((item, index) => (
-                    <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-[12px]">
-                      <span className="text-text-primary">{item.name}{item.amountText ? ` · ${item.amountText}` : ''}</span>
-                      <span className="text-text-tertiary shrink-0">碳 {item.carb} / 蛋 {item.protein} / 脂 {item.fat}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <FoodReceipt
+                items={items}
+                confidence={confidence}
+                warnings={warnings}
+                onUpdate={updateItem}
+              />
             )}
 
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <MacroInput label="碳水" value={carb} onChange={setCarb} />
-              <MacroInput label="蛋白" value={protein} onChange={setProtein} />
-              <MacroInput label="脂肪" value={fat} onChange={setFat} />
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              <MacroInput label="热量" value={calories} unit="kcal" onChange={setCalories} />
+              <MacroInput label="碳水" value={carb} unit="g" onChange={setCarb} />
+              <MacroInput label="蛋白" value={protein} unit="g" onChange={setProtein} />
+              <MacroInput label="脂肪" value={fat} unit="g" onChange={setFat} />
             </div>
-            <div className="flex items-center justify-between mb-4 text-[12px] text-text-tertiary">
-              <span>估算热量</span>
-              <span className="text-text-primary font-semibold">{calories} kcal</span>
-            </div>
-            <Button fullWidth onClick={saveMeal}>保存这一餐</Button>
+            <Button fullWidth onClick={saveMeal}>确认并写入饮食记录</Button>
           </motion.div>
         )}
       </GlassCard>
@@ -348,7 +388,7 @@ export default function MealsPage() {
         )) : (
           <GlassCard padding="p-5" className="text-center">
             <p className="text-[14px] font-medium mb-1">今天还没有饮食记录</p>
-            <p className="text-[12px] text-text-tertiary">从上方输入一餐食物，保存后这里会显示实际摄入。</p>
+            <p className="text-[12px] text-text-tertiary">从上方拍照或输入一餐，保存后这里会显示实际摄入。</p>
           </GlassCard>
         )}
       </div>
@@ -356,13 +396,52 @@ export default function MealsPage() {
   );
 }
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image data'));
-    reader.onerror = () => reject(reader.error || new Error('Failed to read image'));
-    reader.readAsDataURL(file);
-  });
+function FoodReceipt({
+  items,
+  confidence,
+  warnings,
+  onUpdate,
+}: {
+  items: FoodItem[];
+  confidence?: number;
+  warnings: string[];
+  onUpdate: (index: number, patch: Partial<FoodItem>) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[12px] text-text-secondary font-medium">AI 食物小票</p>
+        {confidence !== undefined && <span className="text-[10px] text-text-tertiary">置信度 {Math.round(confidence * 100)}%</span>}
+      </div>
+      <div className="flex flex-col gap-3">
+        {items.map((item, index) => (
+          <div key={`${item.name}-${index}`} className="rounded-lg bg-black/10 p-2">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <input
+                value={item.name}
+                onChange={(event) => onUpdate(index, { name: event.target.value })}
+                className="min-w-0 flex-1 bg-transparent border-none outline-none text-[13px] font-semibold text-text-primary"
+              />
+              <span className="text-[11px] text-text-tertiary shrink-0">{item.calories ?? calculateMealCalories(item)} kcal</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              <MiniInput label="重量" value={item.weightGram ?? 0} unit="g" onChange={(value) => onUpdate(index, { weightGram: value })} />
+              <MiniInput label="碳水" value={item.carb} unit="g" onChange={(value) => onUpdate(index, { carb: value })} />
+              <MiniInput label="蛋白" value={item.protein} unit="g" onChange={(value) => onUpdate(index, { protein: value })} />
+              <MiniInput label="脂肪" value={item.fat} unit="g" onChange={(value) => onUpdate(index, { fat: value })} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {warnings.length > 0 && (
+        <div className="mt-3 flex flex-col gap-1">
+          {warnings.map((warning, index) => (
+            <p key={`${warning}-${index}`} className="text-[11px] text-text-tertiary">{warning}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MacroBox({ label, current, target, color }: { label: string; current: number; target?: number; color: string }) {
@@ -391,20 +470,73 @@ function MacroProgress({ label, current, target, color }: { label: string; curre
   );
 }
 
-function MacroInput({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+function MacroInput({ label, value, unit, onChange }: { label: string; value: number; unit: string; onChange: (value: number) => void }) {
   return (
     <label className="block">
-      <span className="text-[11px] text-text-tertiary block mb-1.5">{label}</span>
-      <div className="rounded-xl border border-white/10 px-3 py-2 flex items-center gap-1">
+      <span className="text-[10px] text-text-tertiary block mb-1.5">{label}</span>
+      <div className="rounded-xl border border-white/10 px-2 py-2 flex items-center gap-1">
         <input
           type="number"
           min={0}
           value={value}
           onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
-          className="w-full bg-transparent border-none outline-none text-[15px] font-semibold text-text-primary"
+          className="w-full bg-transparent border-none outline-none text-[14px] font-semibold text-text-primary"
         />
-        <span className="text-[11px] text-text-tertiary">g</span>
+        <span className="text-[9px] text-text-tertiary">{unit}</span>
       </div>
     </label>
   );
+}
+
+function MiniInput({ label, value, unit, onChange }: { label: string; value: number; unit: string; onChange: (value: number) => void }) {
+  return (
+    <label className="block">
+      <span className="text-[9px] text-text-tertiary block mb-1">{label}</span>
+      <div className="rounded-lg border border-white/10 px-2 py-1.5 flex items-center gap-1">
+        <input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
+          className="w-full bg-transparent border-none outline-none text-[12px] font-medium text-text-primary"
+        />
+        <span className="text-[8px] text-text-tertiary">{unit}</span>
+      </div>
+    </label>
+  );
+}
+
+async function fileToCompressedDataUrl(file: File): Promise<string> {
+  const image = await loadImage(file);
+  const maxSide = 1280;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas is not supported');
+  context.drawImage(image, 0, 0, width, height);
+  return canvas.toDataURL('image/jpeg', 0.82);
+}
+
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    image.src = url;
+  });
+}
+
+function pause(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

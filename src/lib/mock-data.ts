@@ -62,6 +62,9 @@ export interface WeightEntry {
 export interface FoodItem {
   name: string;
   amountText?: string;
+  weightGram?: number;
+  calories?: number;
+  confidence?: number;
   carb: number;
   protein: number;
   fat: number;
@@ -80,6 +83,92 @@ export interface MealLog {
   source: 'ai' | 'manual';
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface DailyReport {
+  id: string;
+  userId?: string;
+  date: string;
+  score: number;
+  summary: string;
+  suggestions: string[];
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface WeeklyReportMetrics {
+  startWeight?: number;
+  endWeight?: number;
+  weightChange?: number;
+  averageCalories: number;
+  averageProtein: number;
+  proteinHitRate: number;
+  completedDays: number;
+  longestStreak: number;
+  mealLoggedDays: number;
+  proteinHitDays: number;
+  predictionDays?: number;
+  dataCompleteness: number;
+}
+
+export interface WeeklyReportRisk {
+  date: string;
+  type: 'binge';
+  message: string;
+}
+
+export interface WeeklyReport {
+  id: string;
+  userId?: string;
+  weekIndex: number;
+  startDate: string;
+  endDate: string;
+  score: number;
+  summary: string;
+  headline?: string;
+  suggestions: string[];
+  metrics: WeeklyReportMetrics;
+  risks: WeeklyReportRisk[];
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface WeightPredictionPoint {
+  date: string;
+  predictedWeight: number;
+  lowerBound: number;
+  upperBound: number;
+}
+
+export interface PlateauDetection {
+  status: 'none' | 'possible' | 'unknown';
+  reason: string;
+  daysChecked: number;
+}
+
+export interface CalorieDeficitSummary {
+  averageTargetCalories: number;
+  averageActualCalories: number;
+  averagePlanGap: number;
+  loggedDays: number;
+}
+
+export interface WeightPredictionResult {
+  id?: string;
+  userId: string;
+  generatedAt: string;
+  currentWeight: number;
+  goalWeight: number;
+  estimatedGoalDate?: string;
+  estimatedDaysToGoal?: number;
+  goalProbability: number;
+  slopeKgPerDay: number;
+  residualStd: number;
+  plateau: PlateauDetection;
+  calorieDeficit: CalorieDeficitSummary;
+  forecast30Days: WeightPredictionPoint[];
+  modelVersion: 'linear-regression-v1';
+  status: 'ready' | 'insufficient_data';
 }
 
 export const carbColors: Record<CarbType, { main: string; bg: string; label: string; emoji: string }> = {
@@ -399,6 +488,9 @@ export const mockWeightLog: WeightEntry[] = [
 ];
 
 export const mockMealLogs: MealLog[] = [];
+export const mockDailyReports: DailyReport[] = [];
+export const mockWeeklyReports: WeeklyReport[] = [];
+export const mockWeightPredictions: WeightPredictionResult[] = [];
 
 export function calculateMealCalories(meal: Pick<MealLog, 'carb' | 'protein' | 'fat'>): number {
   return Math.round(meal.carb * 4 + meal.protein * 4 + meal.fat * 9);
