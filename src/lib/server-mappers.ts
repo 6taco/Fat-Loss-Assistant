@@ -105,13 +105,17 @@ function toTrainingSchedule(value: unknown): TrainingDay[] {
   const schedule = value
     .map((item, dayIndex) => {
       if (!item || typeof item !== 'object') return null;
-      const source = item as { muscleGroup?: unknown; label?: unknown };
+      const source = item as { muscleGroup?: unknown; label?: unknown; cycleMode?: unknown; trainingStreak?: unknown };
       const muscleGroup = toMuscleGroup(source.muscleGroup);
       if (!muscleGroup) return null;
       return {
         dayIndex,
         muscleGroup,
         label: typeof source.label === 'string' ? source.label : muscleGroupLabels[muscleGroup],
+        ...(source.cycleMode === 'rhythm' ? { cycleMode: 'rhythm' as const } : {}),
+        ...(typeof source.trainingStreak === 'number' && Number.isFinite(source.trainingStreak)
+          ? { trainingStreak: Math.max(1, Math.min(6, Math.round(source.trainingStreak))) }
+          : {}),
       };
     })
     .filter((item): item is TrainingDay => Boolean(item));

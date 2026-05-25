@@ -7,6 +7,8 @@ export interface TrainingDay {
   dayIndex: number;
   muscleGroup: MuscleGroup;
   label: string;
+  cycleMode?: 'rhythm';
+  trainingStreak?: number;
 }
 
 export interface UserProfile {
@@ -170,35 +172,40 @@ const DEFAULT_MUSCLE_ROTATION: MuscleGroup[] = ['chest', 'back', 'shoulders', 'l
 
 export function buildTrainingCycleByFrequency(frequency: number): TrainingDay[] {
   const trainingStreak = Math.max(1, Math.min(6, Math.round(frequency) || 3));
-  const trainingDaysPerCycle = lcm(DEFAULT_MUSCLE_ROTATION.length, trainingStreak);
   const days: TrainingDay[] = [];
 
-  for (let trainingIndex = 0; trainingIndex < trainingDaysPerCycle; trainingIndex++) {
+  for (let trainingIndex = 0; trainingIndex < DEFAULT_MUSCLE_ROTATION.length; trainingIndex++) {
+    if (trainingIndex > 0 && trainingIndex % trainingStreak === 0) {
+      days.push({
+        dayIndex: days.length,
+        muscleGroup: 'rest',
+        label: muscleGroupLabels.rest,
+        cycleMode: 'rhythm',
+        trainingStreak,
+      });
+    }
+
     const muscleGroup = DEFAULT_MUSCLE_ROTATION[trainingIndex % DEFAULT_MUSCLE_ROTATION.length];
     days.push({
       dayIndex: days.length,
       muscleGroup,
       label: muscleGroupLabels[muscleGroup],
+      cycleMode: 'rhythm',
+      trainingStreak,
     });
+  }
 
-    if ((trainingIndex + 1) % trainingStreak === 0) {
-      days.push({
-        dayIndex: days.length,
-        muscleGroup: 'rest',
-        label: muscleGroupLabels.rest,
-      });
-    }
+  if (DEFAULT_MUSCLE_ROTATION.length % trainingStreak === 0) {
+    days.push({
+      dayIndex: days.length,
+      muscleGroup: 'rest',
+      label: muscleGroupLabels.rest,
+      cycleMode: 'rhythm',
+      trainingStreak,
+    });
   }
 
   return days;
-}
-
-function gcd(a: number, b: number): number {
-  return b === 0 ? a : gcd(b, a % b);
-}
-
-function lcm(a: number, b: number): number {
-  return Math.abs(a * b) / gcd(a, b);
 }
 
 export function normalizeTrainingCycle(cycle?: TrainingDay[]): TrainingDay[] {
@@ -212,6 +219,10 @@ export function normalizeTrainingCycle(cycle?: TrainingDay[]): TrainingDay[] {
         dayIndex,
         muscleGroup,
         label: day.label || muscleGroupLabels[muscleGroup],
+        ...(day.cycleMode === 'rhythm' ? { cycleMode: 'rhythm' as const } : {}),
+        ...(typeof day.trainingStreak === 'number' && Number.isFinite(day.trainingStreak)
+          ? { trainingStreak: Math.max(1, Math.min(6, Math.round(day.trainingStreak))) }
+          : {}),
       };
     })
     .filter((day): day is TrainingDay => Boolean(day));
@@ -221,8 +232,43 @@ export function normalizeTrainingCycle(cycle?: TrainingDay[]): TrainingDay[] {
   return hasTraining && hasRest ? normalized : defaultTrainingSchedule;
 }
 
+function getCycleRhythm(cycle: TrainingDay[]) {
+  const rhythmDay = cycle.find(day => day.cycleMode === 'rhythm' && day.trainingStreak);
+  if (!rhythmDay?.trainingStreak) return null;
+
+  const rotation = cycle.filter(day => day.muscleGroup !== 'rest').map(day => day.muscleGroup);
+  if (rotation.length === 0) return null;
+
+  return {
+    trainingStreak: Math.max(1, Math.min(6, rhythmDay.trainingStreak)),
+    rotation,
+  };
+}
+
 export function getTrainingDayForDateOffset(cycle: TrainingDay[], offset: number): TrainingDay {
   const normalizedCycle = normalizeTrainingCycle(cycle);
+  const rhythm = getCycleRhythm(normalizedCycle);
+
+  if (rhythm) {
+    const cadenceLength = rhythm.trainingStreak + 1;
+    if (offset % cadenceLength === rhythm.trainingStreak) {
+      return {
+        dayIndex: offset,
+        muscleGroup: 'rest',
+        label: muscleGroupLabels.rest,
+      };
+    }
+
+    const restDaysBeforeOrAtOffset = Math.floor((offset + 1) / cadenceLength);
+    const trainingIndex = offset - restDaysBeforeOrAtOffset;
+    const muscleGroup = rhythm.rotation[trainingIndex % rhythm.rotation.length];
+    return {
+      dayIndex: offset,
+      muscleGroup,
+      label: muscleGroupLabels[muscleGroup],
+    };
+  }
+
   const cycleIndex = offset % normalizedCycle.length;
   const day = normalizedCycle[cycleIndex];
   return {

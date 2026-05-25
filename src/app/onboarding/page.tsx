@@ -30,10 +30,12 @@ const cycleDayNames = ['周一', '周二', '周三', '周四', '周五', '周六
 const getCycleDayName = (index: number) => cycleDayNames[index] || `第 ${index + 1} 天`;
 const getCycleSummary = (cycle: TrainingDay[]) => {
   const normalized = normalizeTrainingCycle(cycle);
+  const rhythmDay = normalized.find(day => day.cycleMode === 'rhythm' && day.trainingStreak);
   const trainingDays = normalized.filter(day => day.muscleGroup !== 'rest').length;
   const firstRestIndex = normalized.findIndex(day => day.muscleGroup === 'rest');
-  const trainingStreak = firstRestIndex > 0 ? firstRestIndex : trainingDays;
-  return `练${trainingStreak}休1 · ${normalized.length} 天一轮`;
+  const trainingStreak = rhythmDay?.trainingStreak || (firstRestIndex > 0 ? firstRestIndex : trainingDays);
+  const unit = rhythmDay ? '项模板' : '天一轮';
+  return `练${trainingStreak}休1 · ${normalized.length} ${unit}`;
 };
 
 const somatotypeOptions: { value: Somatotype; visual: string; desc: string; macros: string }[] = [
@@ -383,7 +385,7 @@ export default function OnboardingPage() {
 
               <label className="text-[13px] text-text-secondary font-medium block mb-3">训练频率</label>
               <p className="text-[12px] text-text-tertiary leading-relaxed mb-3">
-                选择后会按胸、背、肩、腿、手臂、核心持续轮换，并按节奏插入休息日。
+                选择后只需要编辑部位轮换模板，系统会按练几休一节奏自动往后插入休息日。
               </p>
               <div className="flex gap-2 mb-6">
                 {frequencyOptions.map(f => (
@@ -420,7 +422,7 @@ export default function OnboardingPage() {
                 <span className="text-[12px] text-accent-blue">{getCycleSummary(form.trainingSchedule)}</span>
               </div>
               <p className="text-[12px] text-text-tertiary leading-relaxed mb-3">
-                例如练2休1会生成“胸 / 背 / 休 / 肩 / 腿 / 休 / 手臂 / 核心 / 休”，并从开始日期起不断滚动。
+                例如练5休1只需要填“胸 / 背 / 肩 / 腿 / 手臂 / 休 / 核心”，后续会自动继续“胸 / 背 / 肩 / 腿 / 休...”。
               </p>
               <div className="flex flex-col gap-3">
                 {form.trainingSchedule.map(day => (
