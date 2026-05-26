@@ -7,6 +7,7 @@ import { ChevronLeft, Check, Dumbbell, Scale, UserRound } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
+import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
 import { getActiveAccount } from '@/lib/accounts';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
@@ -113,6 +114,8 @@ export default function OnboardingPage() {
       router.replace('/accounts');
       return;
     }
+    identifyAnalyticsUser(account.id);
+    track('onboarding_start', { step_count: TOTAL_STEPS }, { userId: account.id });
     loadEntries();
   }, [loadEntries, router]);
 
@@ -205,9 +208,22 @@ export default function OnboardingPage() {
       trainingSchedule: normalizeTrainingCycle(form.trainingSchedule),
     };
 
+    const generatedPlans = generateCarbCyclePlan(user.startDate, user.weight, user.somatotype, user.trainingSchedule);
+    identifyAnalyticsUser(user.id);
     setUser(user);
-    setPlans(generateCarbCyclePlan(user.startDate, user.weight, user.somatotype, user.trainingSchedule));
+    setPlans(generatedPlans);
     addEntry({ date: form.weightMeasuredDate, weight: numericForm.weight });
+    track('onboarding_complete', {
+      step_count: TOTAL_STEPS,
+      profile_fields: ['gender', 'age', 'height', 'weight', 'bodyFat', 'somatotype', 'trainingFrequency'],
+      training_frequency: user.trainingFrequency,
+      somatotype: user.somatotype,
+    }, { userId: user.id });
+    track('plan_generate', {
+      plan_type: 'carb_cycle',
+      calorie_target: generatedPlans[0]?.calories,
+      carb_cycle: summarizeCarbCycle(generatedPlans.slice(0, 7)),
+    }, { userId: user.id });
     showAppToast('碳循环计划已生成。', 'success');
     router.push('/dashboard');
   };
@@ -512,4 +528,11 @@ export default function OnboardingPage() {
       </div>
     </div>
   );
+}
+
+function summarizeCarbCycle(plans: ReturnType<typeof generateCarbCyclePlan>) {
+  return plans.reduce((summary, plan) => ({
+    ...summary,
+    [plan.carbType]: (summary[plan.carbType] || 0) + 1,
+  }), {} as Record<string, number>);
 }

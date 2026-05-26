@@ -32,19 +32,29 @@ export async function POST(request: NextRequest) {
 
   try {
     const prisma = getPrisma();
-    const meal = await prisma.mealLog.create({
-      data: {
+    const mealData = {
+      userId: body.userId!,
+      date: toDate(body.date!),
+      mealType: body.mealType!,
+      description: body.description!,
+      items: (body.items || []) as unknown as Prisma.InputJsonValue,
+      carb: body.carb!,
+      protein: body.protein!,
+      fat: body.fat!,
+      calories: body.calories ?? calculateMealCalories(body as MealLog),
+      source: body.source || 'manual',
+    };
+    const meal = body.id ? await prisma.mealLog.upsert({
+      where: { id: body.id },
+      create: {
         id: body.id,
-        userId: body.userId!,
-        date: toDate(body.date!),
-        mealType: body.mealType!,
-        description: body.description!,
-        items: (body.items || []) as unknown as Prisma.InputJsonValue,
-        carb: body.carb!,
-        protein: body.protein!,
-        fat: body.fat!,
-        calories: body.calories ?? calculateMealCalories(body as MealLog),
-        source: body.source || 'manual',
+        ...mealData,
+        createdAt: body.createdAt ? new Date(body.createdAt) : undefined,
+      },
+      update: mealData,
+    }) : await prisma.mealLog.create({
+      data: {
+        ...mealData,
         createdAt: body.createdAt ? new Date(body.createdAt) : undefined,
       },
     });

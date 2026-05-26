@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import { DayPlan, UserProfile } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
@@ -39,6 +40,11 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ plans, activePlan: true });
 
     const userId = getLocalUserId();
+    track('plan_generate', {
+      plan_type: 'carb_cycle',
+      calorie_target: plans[0]?.calories,
+      days: plans.length,
+    }, { userId });
     if (userId) void sendJson('/api/day-plans', 'POST', { userId, plans });
   },
 
@@ -51,6 +57,13 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set({ plans });
 
     const userId = getLocalUserId();
+    if (updated?.completed) {
+      track('plan_complete', {
+        date,
+        carb_type: updated.carbType,
+        calories: updated.calories,
+      }, { userId });
+    }
     if (userId && updated) {
       void sendJson('/api/day-plans', 'PATCH', {
         userId,

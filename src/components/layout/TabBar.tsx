@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, Calendar, ClipboardList, Home, MessageSquare, Utensils } from 'lucide-react';
+import { BarChart3, Brain, BrainCircuit, Calendar, ClipboardList, Home, Utensils } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const tabs = [
@@ -10,7 +10,8 @@ const tabs = [
   { id: 'plan', label: '计划', icon: ClipboardList, path: '/plan' },
   { id: 'meals', label: '饮食', icon: Utensils, path: '/meals' },
   { id: 'calendar', label: '日历', icon: Calendar, path: '/calendar' },
-  { id: 'chat', label: 'AI', icon: MessageSquare, path: '/chat' },
+  { id: 'coach', label: '教练', icon: Brain, path: '/coach' },
+  { id: 'digital-twin', label: '分身', icon: BrainCircuit, path: '/digital-twin' },
   { id: 'trends', label: '趋势', icon: BarChart3, path: '/trends' },
 ];
 
@@ -23,8 +24,9 @@ export default function TabBar() {
     <nav className="fixed bottom-0 left-0 right-0 z-50 tab-bar-blur">
       <div className="max-w-[430px] mx-auto flex items-start justify-around pt-2.5 pb-7 px-1">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.path);
+          const active = pathname.startsWith(tab.path) || (tab.id === 'coach' && pathname.startsWith('/chat'));
           const Icon = tab.icon;
+
           return (
             <Link
               key={tab.id}
@@ -34,13 +36,13 @@ export default function TabBar() {
                 if (active) event.preventDefault();
               }}
               className={cn(
-                'flex flex-col items-center gap-1 min-w-[42px] bg-transparent border-none cursor-pointer transition-all active:scale-95',
+                'flex flex-col items-center gap-1 min-w-[38px] bg-transparent border-none cursor-pointer transition-all active:scale-95',
                 active ? 'text-accent-blue' : 'text-text-tertiary',
               )}
               aria-label={tab.label}
             >
               <Icon
-                size={22}
+                size={21}
                 strokeWidth={1.8}
                 className={cn(active && 'drop-shadow-[0_0_6px_rgba(10,132,255,0.5)]')}
               />

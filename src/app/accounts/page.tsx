@@ -6,6 +6,7 @@ import { LogIn, Plus, UserRound } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
+import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
 import { Account, createAccount, getAccounts, setActiveAccount, validateAccountName } from '@/lib/accounts';
 import { getItem, KEYS } from '@/lib/storage';
 import { UserProfile } from '@/lib/mock-data';
@@ -30,6 +31,8 @@ export default function AccountsPage() {
 
     try {
       const account = createAccount(name);
+      identifyAnalyticsUser(account.id);
+      track('sign_up', { channel: 'local_account', account_type: 'local' }, { userId: account.id });
       showAppToast('账户已创建。', 'success');
       goNext(account.id);
     } catch (error) {
@@ -44,6 +47,7 @@ export default function AccountsPage() {
       setAccounts(getAccounts());
       return;
     }
+    identifyAnalyticsUser(account.id);
     goNext(account.id);
   };
 

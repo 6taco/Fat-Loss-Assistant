@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import AnalyticsProvider from '@/components/analytics/AnalyticsProvider';
 import TabBar from '@/components/layout/TabBar';
 import ToastHost from '@/components/ui/ToastHost';
 
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-dvh bg-bg-primary text-text-primary font-sans">
         <main className="max-w-[430px] mx-auto relative min-h-dvh">
+          <AnalyticsProvider />
           {children}
         </main>
         <TabBar />

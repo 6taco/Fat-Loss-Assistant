@@ -52,6 +52,13 @@ model User {
   dailyReports      DailyReport[]
   weeklyReports     WeeklyReport[]
   weightPredictions WeightPrediction[]
+  coachMemories     CoachMemory[]
+  coachInsights     CoachInsight[]
+  actionProposals   ActionProposal[]
+  mealPlans         MealPlan[]
+  trainingPlans     TrainingPlan[]
+  shoppingLists     ShoppingList[]
+  notificationEvents NotificationEvent[]
 }
 
 model DayPlan {
@@ -172,4 +179,473 @@ model WeightPrediction {
 
   @@index([userId])
   @@index([userId, generatedAt])
+}
+
+model DigitalTwinProfile {
+  id               String   @id @default(cuid())
+  userId           String
+  version          String   @default("digital-twin-v1")
+  generatedAt      DateTime @default(now())
+  dataStartDate    DateTime? @db.Date
+  dataEndDate      DateTime? @db.Date
+  dataQuality      Json
+  persona          Json
+  behaviorProfile  Json
+  nutritionProfile Json
+  trainingProfile  Json
+  plateauProfile   Json
+  modelSummary     Json
+  confidence       String
+  createdAt        DateTime @default(now())
+
+  @@index([userId, generatedAt])
+}
+
+model DigitalTwinFeatureSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  windowDays Int
+  features   Json
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, date, windowDays])
+  @@index([userId, date])
+}
+
+model DigitalTwinPrediction {
+  id              String   @id @default(cuid())
+  userId          String
+  profileId       String?
+  scenarioId      String?
+  horizonDays     Int
+  currentWeight   Float
+  predictedWeight Float?
+  goalProbability Int
+  slopeKgPerDay   Float
+  plateauRisk     String
+  forecast         Json
+  assumptions      Json
+  confidence       String
+  modelVersion     String   @default("digital-twin-v1")
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([profileId])
+  @@index([scenarioId])
+}
+
+model DigitalTwinScenario {
+  id          String   @id @default(cuid())
+  userId      String
+  profileId   String?
+  type        String
+  title       String
+  assumptions Json
+  result      Json?
+  status      String   @default("completed")
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+model CoachMemory {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String
+  title      String
+  content    Json
+  confidence Float
+  source     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type])
+}
+
+model AgentRun {
+  id         String    @id @default(cuid())
+  userId     String
+  runType    String
+  status     String    @default("running")
+  input      Json
+  output     Json?
+  error      String?   @db.Text
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([userId, startedAt])
+  @@index([runType, status])
+}
+
+model AgentMessage {
+  id           String   @id @default(cuid())
+  runId        String
+  userId       String
+  fromAgent    String
+  toAgent      String
+  messageType  String
+  payload      Json
+  confidence   String
+  evidenceRefs Json
+  createdAt    DateTime @default(now())
+
+  @@index([runId])
+  @@index([userId, createdAt])
+  @@index([fromAgent, toAgent])
+}
+
+model AgentFinding {
+  id         String   @id @default(cuid())
+  runId      String
+  userId     String
+  agent      String
+  type       String
+  severity   String
+  title      String
+  summary    String   @db.Text
+  evidence   Json
+  confidence String
+  status     String   @default("new")
+  createdAt  DateTime @default(now())
+
+  @@index([runId])
+  @@index([userId, createdAt])
+  @@index([agent, type])
+}
+
+model AgentMemory {
+  id         String   @id @default(cuid())
+  userId     String
+  agent      String
+  type       String
+  title      String
+  content    Json
+  confidence Float
+  source     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, agent])
+  @@index([userId, type])
+}
+
+model CoachInsight {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  type      String
+  severity  String
+  title     String
+  summary   String   @db.Text
+  evidence  Json
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([userId, status])
+}
+
+model ActionProposal {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  status    String    @default("pending")
+  title     String
+  summary   String    @db.Text
+  payload   Json
+  reason    Json
+  safety    Json
+  toolName  String?
+  executionState String @default("draft")
+  diffPreview Json?
+  approvedAt DateTime?
+  approvedByUserId String?
+  createdAt DateTime  @default(now())
+  decidedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, type])
+  @@index([toolName])
+}
+
+model ToolDefinition {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  version     String
+  description String   @db.Text
+  riskLevel   String
+  requiresConfirmation Boolean @default(true)
+  inputSchema Json
+  outputSchema Json
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ToolInvocationLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  toolName     String
+  proposalId   String?
+  idempotencyKey String?
+  mode         String
+  rawInput     Json
+  parsedInput  Json?
+  validationError String?
+  status       String   @default("received")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([toolName, createdAt])
+  @@index([proposalId])
+  @@index([idempotencyKey])
+}
+
+model ToolExecutionLog {
+  id           String   @id @default(cuid())
+  userId       String?
+  toolName     String
+  proposalId   String?
+  approvedByUserId String?
+  status       String   @default("queued")
+  durationMs   Int?
+  errorCode    String?
+  resultJson   Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([toolName, createdAt])
+  @@index([proposalId])
+}
+
+model ToolExecutionSnapshot {
+  id           String   @id @default(cuid())
+  userId       String?
+  toolName     String
+  proposalId   String?
+  beforeJson   Json
+  afterJson    Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([toolName, createdAt])
+  @@index([proposalId])
+}
+
+model MealPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  meals     Json
+  macros    Json
+  source    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model TrainingPlan {
+  id        String   @id @default(cuid())
+  userId    String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  days      Json
+  source    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+}
+
+model ShoppingList {
+  id        String   @id @default(cuid())
+  userId    String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  items     Json
+  source    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startDate])
+}
+
+model NotificationEvent {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String
+  title       String
+  body        String
+  payload     Json?
+  status      String    @default("queued")
+  scheduledAt DateTime
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([scheduledAt])
+}
+
+model KnowledgeSource {
+  id         String   @id @default(cuid())
+  title      String
+  authority  String
+  sourceType String
+  url        String?
+  year       Int?
+  language   String   @default("zh")
+  license    String?
+  status     String   @default("active")
+  checksum   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  chunks     KnowledgeChunk[]
+
+  @@index([sourceType])
+  @@index([authority])
+  @@index([status])
+  @@index([checksum])
+}
+
+model KnowledgeChunk {
+  id             String          @id @default(cuid())
+  sourceId       String
+  chunkIndex     Int
+  title          String
+  text           String          @db.Text
+  summary        String?         @db.Text
+  topic          Json
+  metadata       Json
+  tokenCount     Int
+  embedding      Json?
+  embeddingModel String?
+  status         String          @default("active")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  source         KnowledgeSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceId, chunkIndex])
+  @@index([sourceId])
+  @@index([status])
+}
+
+model RagQueryLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  question   String   @db.Text
+  intent     String?
+  retrieved  Json
+  citations  Json
+  confidence String
+  latencyMs  Int
+  cost       Float?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model AnalyticsIdentity {
+  id           String   @id @default(cuid())
+  userId       String?
+  anonymousId  String   @unique
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @updatedAt
+  firstUserAt   DateTime?
+  lastUserAt    DateTime?
+
+  @@index([userId])
+}
+
+model AnalyticsSession {
+  id           String   @id @default(cuid())
+  sessionId    String   @unique
+  userId       String?
+  anonymousId  String
+  startedAt    DateTime
+  endedAt      DateTime?
+  durationMs   Int?
+  route        String?
+  source       String   @default("web")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, startedAt])
+  @@index([anonymousId, startedAt])
+  @@index([startedAt])
+}
+
+model AnalyticsEvent {
+  id           String   @id @default(cuid())
+  eventId      String   @unique
+  eventName    String
+  eventVersion  Int      @default(1)
+  userId       String?
+  anonymousId  String
+  sessionId    String?
+  occurredAt   DateTime
+  clientTs     BigInt?
+  route        String?
+  source       String   @default("web")
+  pageRef      String?
+  properties   Json
+  context      Json
+  status       String   @default("received")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, occurredAt])
+  @@index([anonymousId, occurredAt])
+  @@index([eventName, occurredAt])
+  @@index([sessionId])
+  @@index([occurredAt, eventName])
+}
+
+model AnalyticsDailyAggregate {
+  id                String   @id @default(cuid())
+  date              DateTime @db.Date
+  eventName         String
+  userCount         Int      @default(0)
+  eventCount        Int      @default(0)
+  sessionCount      Int      @default(0)
+  uniqueAnonymous   Int      @default(0)
+  properties        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([date, eventName])
+  @@index([date])
+  @@index([eventName])
+}
+
+model AnalyticsUserLifecycle {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  anonymousId            String?
+  registeredAt           DateTime?
+  onboardingCompletedAt   DateTime?
+  firstPlanGeneratedAt    DateTime?
+  firstWeightLoggedAt     DateTime?
+  firstMealLoggedAt       DateTime?
+  firstPhotoUploadedAt    DateTime?
+  firstDailyReportViewAt  DateTime?
+  firstWeeklyReportViewAt DateTime?
+  firstAiChatAt           DateTime?
+  firstCoachFeedViewAt    DateTime?
+  firstProposalAcceptAt   DateTime?
+  updatedAt               DateTime @updatedAt
+  createdAt               DateTime @default(now())
+
+  @@index([anonymousId])
 }

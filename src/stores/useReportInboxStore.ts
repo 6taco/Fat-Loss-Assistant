@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import {
   calculateMealCalories,
@@ -122,13 +123,25 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
     const userId = getLocalUserId();
 
     if (type === 'daily') {
+      const report = get().dailyReports.find(item => item.id === id);
       const reports = get().dailyReports.map(report => report.id === id ? { ...report, readAt } : report);
       setItem(getScopedKey(KEYS.DAILY_REPORTS), reports);
       set({ dailyReports: reports });
+      track('daily_report_view', {
+        report_id: id,
+        report_date: report?.date,
+        entry_point: 'report_inbox',
+      }, { userId });
     } else {
+      const report = get().weeklyReports.find(item => item.id === id);
       const reports = get().weeklyReports.map(report => report.id === id ? { ...report, readAt } : report);
       setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
       set({ weeklyReports: reports });
+      track('weekly_report_view', {
+        report_id: id,
+        week_index: report?.weekIndex,
+        entry_point: 'report_inbox',
+      }, { userId });
     }
 
     if (userId) void sendJson('/api/reports/read', 'PATCH', { userId, type, id });

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import { calculateMealCalories, MealLog, sumMealMacros, UserProfile } from '@/lib/mock-data';
 import { getItem, KEYS, setItem } from '@/lib/storage';
@@ -62,6 +63,12 @@ export const useMealStore = create<MealState>((set, get) => ({
     set({ meals });
 
     const userId = getLocalUserId();
+    track('meal_log_create', {
+      date: nextMeal.date,
+      meal_type: nextMeal.mealType,
+      calories: nextMeal.calories,
+      source: nextMeal.source,
+    }, { userId });
     if (userId) void sendJson('/api/meal-logs', 'POST', { ...nextMeal, userId });
   },
 

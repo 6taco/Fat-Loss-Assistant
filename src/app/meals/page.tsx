@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { showAppToast } from '@/components/ui/ToastHost';
+import { track } from '@/lib/analytics/client';
 import { calculateMealCalories, type FoodItem, type MealLog, mealTypeLabels, type MealType, sumMealMacros } from '@/lib/mock-data';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
@@ -160,6 +161,12 @@ export default function MealsPage() {
 
       applyEstimate(data.estimate);
       setRecognitionStep('请确认结果');
+      track('photo_upload', {
+        meal_type: mealType,
+        confidence: data.estimate.confidence,
+        source: 'vision_estimate',
+        review_provider: data.reviewProvider || 'unknown',
+      });
       showAppToast(data.reviewProvider ? '照片已识别并复核，请确认后保存。' : '照片已识别，请确认后保存。', 'success');
     } catch {
       setEditMode(true);

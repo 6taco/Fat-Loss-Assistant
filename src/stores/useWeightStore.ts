@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import { UserProfile, WeightEntry } from '@/lib/mock-data';
 import { getItem, setItem, KEYS } from '@/lib/storage';
@@ -46,6 +47,11 @@ export const useWeightStore = create<WeightState>((set, get) => ({
     set({ entries: updated });
 
     const userId = getLocalUserId();
+    track('weight_log_create', {
+      date: entry.date,
+      weight: entry.weight,
+      source: 'manual',
+    }, { userId });
     if (userId) void sendJson('/api/weight-entries', 'POST', { ...entry, userId });
   },
 }));

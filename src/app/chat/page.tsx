@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
-import { CalendarCheck, ChevronUp, HeartPulse, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, CalendarCheck, ChevronUp, HeartPulse, RotateCw, Send, Sparkles, X } from 'lucide-react';
+import { track } from '@/lib/analytics/client';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { useChatStore } from '@/stores/useChatStore';
 import { useDailyReportStore } from '@/stores/useDailyReportStore';
@@ -47,6 +49,7 @@ const mockAIResponses: Record<string, { content: string; cards?: ChatCard[] }> =
 };
 
 export default function ChatPage() {
+  const router = useRouter();
   const { messages, isTyping, loadMessages, addMessage, setTyping } = useChatStore();
   const { user, loadUser } = useUserStore();
   const { plans, loadPlans } = usePlanStore();
@@ -84,7 +87,11 @@ export default function ChatPage() {
       content: text.trim(),
       timestamp: sentAt.toISOString(),
     };
-    addMessage(userMsg);
+      addMessage(userMsg);
+    track('ai_chat_send', {
+      message_length: text.trim().length,
+      quick_tag: text.trim(),
+    });
     setInput('');
 
     const todayPlan = getTodayPlan(plans);
@@ -110,6 +117,11 @@ export default function ChatPage() {
       if (!response.ok) throw data;
 
       setTyping(false);
+      track('ai_chat_reply', {
+        provider: data?.source || 'local',
+        rag_used: Boolean(data?.message?.cards?.length),
+        confidence: data?.message?.cards?.length ? 'high' : 'medium',
+      });
       addMessage(data.message as ChatMessage);
     } catch (error) {
       const fallback = error && typeof error === 'object' && 'fallback' in error
@@ -143,6 +155,15 @@ export default function ChatPage() {
         <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-accent-blue/10 blur-3xl" />
         <div className="absolute top-40 -left-28 w-72 h-72 rounded-full bg-carb-low/10 blur-3xl" />
       </div>
+
+      <button
+        type="button"
+        onClick={() => router.push('/coach')}
+        className="absolute left-5 top-5 z-40 w-11 h-11 rounded-full border border-white/15 bg-bg-secondary/85 backdrop-blur-2xl flex items-center justify-center text-text-secondary shadow-[0_12px_40px_rgba(0,0,0,0.35)] active:scale-95 transition-transform"
+        aria-label="返回教练页"
+      >
+        <ArrowLeft size={19} />
+      </button>
 
       <TopFloatingPanels
         openPanel={openPanel}

@@ -10,6 +10,7 @@ import InstallPrompt from '@/components/pwa/InstallPrompt';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
 import { showAppToast } from '@/components/ui/ToastHost';
+import { track } from '@/lib/analytics/client';
 import { clearLocalAppData, downloadLocalAppData } from '@/lib/app-data';
 import { clearActiveAccount, getActiveAccount, getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS } from '@/lib/storage';
@@ -113,7 +114,11 @@ export default function DashboardPage() {
         <div className="flex gap-2">
           <button
             className="relative w-9 h-9 glass-card rounded-full flex items-center justify-center"
-            onClick={() => setShowInbox(true)}
+            onClick={() => {
+              track('daily_report_view', { entry_point: 'dashboard_inbox', unread_count: dailyReports.filter(report => !report.readAt).length });
+              track('weekly_report_view', { entry_point: 'dashboard_inbox', unread_count: weeklyReports.filter(report => !report.readAt).length });
+              setShowInbox(true);
+            }}
             aria-label="报告收件箱"
           >
             <Inbox size={16} className="text-text-secondary" />
