@@ -1,14 +1,15 @@
 'use client';
 
-import { motion, HTMLMotionProps } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 type Variant = 'default' | 'elevated' | 'highlight';
 
-interface GlassCardProps extends HTMLMotionProps<'div'> {
+interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: Variant;
   padding?: string;
 }
+
+import React from 'react';
 
 const variantClass: Record<Variant, string> = {
   default: 'glass-card',
@@ -24,14 +25,11 @@ export default function GlassCard({
   ...props
 }: GlassCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+    <div
       className={cn(variantClass[variant], padding, className)}
       {...props}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }

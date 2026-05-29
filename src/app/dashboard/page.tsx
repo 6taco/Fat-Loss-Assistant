@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import {
@@ -66,7 +65,8 @@ export default function DashboardPage() {
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
   const { loadMeals, getDailySummary } = useMealStore();
   const { dailyReports, weeklyReports, isLoading: reportsLoading, loadReports, generateWeeklyReport, markRead } = useReportInboxStore();
-  const { currentStrategy, recommendation, proposals: strategyProposals, executionRate, loadCurrent: loadStrategy, recheck: recheckStrategy } = useStrategyStore();
+  const { currentStrategy, recommendation, proposals: strategyProposals, executionRate, loadCurrent: loadStrategy, recheck: recheckStrategy, isLoading: strategyLoading } = useStrategyStore();
+  const isLoading = reportsLoading || strategyLoading;
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
@@ -123,12 +123,15 @@ export default function DashboardPage() {
 
   return (
     <div className="px-5 pt-14 pb-28 min-h-dvh relative overflow-hidden">
+      {isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-[3px] overflow-hidden">
+          <div className="h-full bg-accent-blue animate-loading-bar" />
+        </div>
+      )}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <motion.div
-          className="absolute w-[400px] h-[400px] rounded-full"
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-35"
           style={{ background: `radial-gradient(circle, ${color.main}08, transparent 70%)`, top: '-10%', right: '-30%' }}
-          animate={{ scale: [1, 1.08, 1], opacity: [0.3, 0.48, 0.3] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         />
       </div>
 
@@ -204,14 +207,11 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-6 mb-4">
             <div className="flex-shrink-0">
-              <motion.div
+              <div
                 className="text-[56px] font-bold leading-none gradient-accent-text"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
               >
                 {burnIndex}
-              </motion.div>
+              </div>
               <p className="text-[11px] text-text-tertiary mt-1">燃脂指数 / 100</p>
             </div>
             <div className="flex-1 flex justify-center">
@@ -266,13 +266,13 @@ export default function DashboardPage() {
           {chartEntries.map((entry, index) => {
             const height = ((entry.weight - minChartWeight) / chartRange) * 100;
             return (
-              <motion.div
+              <div
                 key={`${entry.date}-${index}`}
                 className="flex-1 rounded-sm"
-                style={{ background: index === chartEntries.length - 1 ? '#68B96C' : 'rgba(96,74,48,0.08)' }}
-                initial={{ height: 0 }}
-                animate={{ height: `${Math.max(10, height)}%` }}
-                transition={{ duration: 0.5, delay: index * 0.05 }}
+                style={{
+                  height: `${Math.max(10, height)}%`,
+                  background: index === chartEntries.length - 1 ? '#68B96C' : 'rgba(96,74,48,0.08)',
+                }}
               />
             );
           })}
@@ -603,7 +603,7 @@ function DailyReportDetail({ report, onBack }: { report: DailyReport; onBack: ()
 
 function ActionCard({ icon: Icon, label, color, onClick }: { icon: LucideIcon; label: string; color: string; onClick: () => void }) {
   return (
-    <GlassCard padding="p-3" className="flex flex-col items-center gap-2 cursor-pointer" whileTap={{ scale: 0.95 }} onClick={onClick}>
+    <GlassCard padding="p-3" className="flex flex-col items-center gap-2 cursor-pointer active:scale-95 transition-transform" onClick={onClick}>
       <Icon size={20} style={{ color }} />
       <span className="text-[12px] text-text-secondary">{label}</span>
     </GlassCard>
@@ -620,23 +620,18 @@ function ModalBackdrop({
   maxWidth?: string;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <div
       className="fixed inset-0 z-50 flex items-center justify-center px-8"
       style={{ background: 'rgba(42,38,31,0.38)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', damping: 20 }}
+      <div
         className={`glass-card-elevated p-6 rounded-2xl w-full ${maxWidth}`}
         onClick={(event) => event.stopPropagation()}
       >
         {children}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

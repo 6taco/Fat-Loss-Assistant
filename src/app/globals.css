@@ -64,7 +64,7 @@ body {
 
 /* ===== Glass Morphism Utilities ===== */
 .glass-card {
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(96, 74, 48, 0.08);
   border-radius: 16px;
   backdrop-filter: blur(18px);
@@ -75,7 +75,7 @@ body {
 }
 
 .glass-card-elevated {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(100, 139, 88, 0.15);
   border-radius: 16px;
   backdrop-filter: blur(18px);
@@ -86,7 +86,7 @@ body {
 }
 
 .glass-card-highlight {
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(247, 255, 241, 0.86));
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(247, 255, 241, 0.94));
   border: 1px solid rgba(103, 181, 107, 0.18);
   border-radius: 16px;
   backdrop-filter: blur(18px);
@@ -96,6 +96,21 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.92),
     0 14px 36px rgba(103, 181, 107, 0.14);
+}
+
+/* 低性能设备禁用 backdrop-filter，用更高不透明度的背景替代 */
+@media (prefers-reduced-motion: reduce) {
+  .glass-card, .glass-card-elevated, .glass-card-highlight, .tab-bar-blur {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-card { background: rgba(255, 255, 255, 0.97); }
+  .glass-card-elevated { background: rgba(255, 255, 255, 0.99); }
+  .glass-card-highlight { background: linear-gradient(145deg, rgba(255, 255, 255, 0.99), rgba(247, 255, 241, 0.99)); }
+  .tab-bar-blur { background: rgba(255, 253, 248, 0.99); }
 }
 
 .glass-card-highlight::before {
@@ -145,11 +160,22 @@ body {
 .animate-float { animation: float 6s ease-in-out infinite; }
 .animate-breathe { animation: breathe 4s ease-in-out infinite; }
 
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-loading-bar {
+  width: 100%;
+  animation: loading-bar 1.4s ease-in-out infinite;
+}
+
 /* ===== Tab Bar ===== */
 .tab-bar-blur {
-  background: rgba(255, 253, 248, 0.9);
+  background: rgba(255, 253, 248, 0.97);
   border-top: 1px solid rgba(96, 74, 48, 0.08);
-  backdrop-filter: blur(26px) saturate(1.35);
-  -webkit-backdrop-filter: blur(26px) saturate(1.35);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
   box-shadow: 0 -10px 30px rgba(104, 83, 55, 0.08);
 }
