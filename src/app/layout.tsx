@@ -5,6 +5,7 @@ import AnalyticsProvider from '@/components/analytics/AnalyticsProvider';
 import DataInitProvider from '@/components/providers/DataInitProvider';
 import TabBar from '@/components/layout/TabBar';
 import ToastHost from '@/components/ui/ToastHost';
+import PWAInstallSheet from '@/components/pwa/PWAInstallSheet';
 
 export const metadata: Metadata = {
   title: '轻燃AI',
@@ -48,6 +49,7 @@ export default function RootLayout({
         </main>
         <TabBar />
         <ToastHost />
+        <PWAInstallSheet />
         <Script src="/sw-register.js" strategy="afterInteractive" />
       </body>
     </html>
