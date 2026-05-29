@@ -62,7 +62,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     set({ isLoading: true, error: '' });
     const data = await sendJson<{ feed: CoachFeed; error?: string; warning?: string; source?: string }>('/api/coach/run-daily', 'POST', { userId, force: true });
     if (!data?.feed) {
-      set({ isLoading: false, error: data?.error || '每日教练分析生成失败。' });
+      set({ isLoading: false, error: data?.error || data?.warning || '每日教练分析生成失败，请稍后重试。' });
       return;
     }
     const feed = normalizeFeed(data.feed);
@@ -70,7 +70,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     set({
       feed,
       isLoading: false,
-      error: data.source === 'local' ? `教练数据暂未写入数据库：${data.warning || '请检查 DATABASE_URL 或运行数据库迁移。'}` : '',
+      error: data.source === 'local' ? (data.warning || '教练数据暂未写入数据库，请检查数据库连接。') : '',
     });
   },
 
@@ -82,7 +82,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     set({ isLoading: true, error: '' });
     const data = await sendJson<{ feed: CoachFeed; error?: string; warning?: string; source?: string }>('/api/coach/run-weekly', 'POST', { userId, force: true });
     if (!data?.feed) {
-      set({ isLoading: false, error: data?.error || '每周教练策略生成失败。' });
+      set({ isLoading: false, error: data?.error || data?.warning || '每周教练策略生成失败，请稍后重试。' });
       return;
     }
     const feed = normalizeFeed(data.feed);
@@ -90,7 +90,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     set({
       feed,
       isLoading: false,
-      error: data.source === 'local' ? `教练数据暂未写入数据库：${data.warning || '请检查 DATABASE_URL 或运行数据库迁移。'}` : '',
+      error: data.source === 'local' ? (data.warning || '教练数据暂未写入数据库，请检查数据库连接。') : '',
     });
   },
 

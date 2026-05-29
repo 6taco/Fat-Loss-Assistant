@@ -15,8 +15,8 @@ export async function sendJson<T>(url: string, method: 'POST' | 'PATCH' | 'DELET
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    if (!response.ok) return null;
-    return await response.json() as T;
+    const data = await response.json() as T;
+    return data;
   } catch {
     return null;
   }
