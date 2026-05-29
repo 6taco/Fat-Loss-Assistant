@@ -7,10 +7,11 @@ import { showAppToast } from '@/components/ui/ToastHost';
 
 export default function InstallPrompt() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(() => isStandalonePwa());
+  const [isInstalled, setIsInstalled] = useState(false);
   const [statusText, setStatusText] = useState('检测安装环境中');
 
   useEffect(() => {
+    setIsInstalled(isStandalonePwa());
     void getPwaStatus().then((status) => {
       if (status.standalone) setStatusText('已从主屏幕独立窗口打开');
       else if (status.serviceWorker && status.manifest) setStatusText('已具备安装条件');
@@ -26,7 +27,7 @@ export default function InstallPrompt() {
     const onInstalled = () => {
       setIsInstalled(true);
       setPromptEvent(null);
-      showAppToast('减脂助手已安装到手机。', 'success');
+      showAppToast('轻燃AI已安装到手机。', 'success');
     };
 
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
@@ -55,7 +56,7 @@ export default function InstallPrompt() {
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-glass px-4 py-3">
+    <div className="rounded-xl border border-border-glass bg-glass px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {isInstalled ? <CheckCircle2 size={16} className="text-carb-low shrink-0" /> : <Download size={16} className="text-accent-blue shrink-0" />}

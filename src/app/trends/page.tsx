@@ -270,11 +270,13 @@ function WeightPredictionCard({
   const canPredict = history.length >= 3;
   const ready = prediction?.status === 'ready';
   const statusText = prediction ? getPredictionStatusText(prediction) : '根据体重记录和热量执行，生成未来 30 天趋势。';
+  const actionText = isLoading ? '生成中' : ready ? '重新生成' : '生成预测';
+  const actionDisabled = isLoading || !canPredict;
 
   return (
     <GlassCard className="mb-3 overflow-hidden">
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Activity size={14} className="text-accent-blue" />
             <span className="text-[13px] font-medium">AI 体重预测</span>
@@ -283,12 +285,13 @@ function WeightPredictionCard({
         </div>
         <button
           onClick={onGenerate}
-          disabled={isLoading}
-          className="shrink-0 h-9 px-3 rounded-full border border-white/10 bg-white/[0.06] text-[12px] font-medium text-white/85 disabled:opacity-50"
+          disabled={actionDisabled}
+          className="shrink-0 h-9 px-3 rounded-full gradient-accent text-[12px] font-semibold text-white shadow-[0_4px_14px_rgba(10,132,255,0.24)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+          aria-label={actionText}
         >
           <span className="inline-flex items-center gap-1.5">
             <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
-            {isLoading ? '生成中' : '生成预测'}
+            {actionText}
           </span>
         </button>
       </div>
@@ -339,10 +342,18 @@ function WeightPredictionCard({
               <p className="mt-3 text-[11px] leading-relaxed text-text-tertiary">{prediction.plateau.reason}</p>
             </>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4">
-              <p className="text-[12px] text-text-tertiary">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-5 text-center">
+              <p className={`text-[12px] leading-relaxed ${error ? 'text-carb-high' : 'text-text-tertiary'}`}>
                 {error || prediction?.plateau.reason || '点击生成预测后，会在这里显示未来 30 天曲线。'}
               </p>
+              <button
+                onClick={onGenerate}
+                disabled={actionDisabled}
+                className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-full gradient-accent px-5 text-[13px] font-semibold text-white shadow-[0_6px_18px_rgba(10,132,255,0.28)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                {actionText}
+              </button>
             </div>
           )}
         </>

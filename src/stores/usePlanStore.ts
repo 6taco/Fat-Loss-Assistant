@@ -9,7 +9,7 @@ interface PlanState {
   plans: DayPlan[];
   activePlan: boolean;
   loadPlans: () => void;
-  setPlans: (plans: DayPlan[]) => void;
+  setPlans: (plans: DayPlan[], planType?: string) => void;
   toggleComplete: (date: string) => void;
 }
 
@@ -35,13 +35,14 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     });
   },
 
-  setPlans: (plans) => {
+  setPlans: (plans, planType) => {
     setItem(getScopedKey(KEYS.PLAN), plans);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('strategy-cache-change'));
     set({ plans, activePlan: true });
 
     const userId = getLocalUserId();
     track('plan_generate', {
-      plan_type: 'carb_cycle',
+      plan_type: planType || plans[0]?.strategyType || 'carb_cycle',
       calorie_target: plans[0]?.calories,
       days: plans.length,
     }, { userId });

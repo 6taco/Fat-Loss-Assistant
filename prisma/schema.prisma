@@ -23,6 +23,31 @@ enum CarbType {
   low
 }
 
+enum FatLossStrategyType {
+  calorie_deficit
+  if_16_8
+  carb_cycling
+}
+
+enum StrategyIntensity {
+  gentle
+  standard
+  aggressive
+}
+
+enum StrategyStatus {
+  active
+  superseded
+  paused
+}
+
+enum StrategyAdjustmentStatus {
+  pending
+  accepted
+  dismissed
+  expired
+}
+
 enum ChatRole {
   user
   ai
@@ -52,6 +77,10 @@ model User {
   dailyReports      DailyReport[]
   weeklyReports     WeeklyReport[]
   weightPredictions WeightPrediction[]
+  lifestyleProfile  UserLifestyleProfile?
+  strategyProfiles  FatLossStrategyProfile[]
+  strategySnapshots StrategyExecutionSnapshot[]
+  strategyAdjustmentProposals StrategyAdjustmentProposal[]
   coachMemories     CoachMemory[]
   coachInsights     CoachInsight[]
   actionProposals   ActionProposal[]
@@ -71,6 +100,10 @@ model DayPlan {
   protein   Int
   fat       Int
   completed Boolean  @default(false)
+  strategyId    String?
+  strategyType  FatLossStrategyType @default(carb_cycling)
+  fastingWindow Json?
+  dayGoal       Json?
   muscleGroup   String?
   trainingLabel String?
   createdAt DateTime @default(now())
@@ -79,6 +112,96 @@ model DayPlan {
 
   @@unique([userId, date])
   @@index([userId])
+  @@index([strategyId])
+  @@index([strategyType])
+}
+
+model UserLifestyleProfile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  sleepRegularity      String
+  averageSleepHours    Float?
+  workStudyRhythm      String
+  oftenStaysUpLate     Boolean  @default(false)
+  isStudent            Boolean  @default(false)
+  dietRegularity       String
+  bingeRisk            String
+  takeawayFrequency    String
+  complexPlanTolerance String
+  hasFitnessHabit      Boolean  @default(false)
+  hasStrengthTraining  Boolean  @default(false)
+  trainingExperience   String
+  fatLossGoal          String
+  targetWeeks          Int?
+  derivedMetrics       Json
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FatLossStrategyProfile {
+  id                    String              @id @default(cuid())
+  userId                String
+  strategyType          FatLossStrategyType
+  status                StrategyStatus       @default(active)
+  intensity             StrategyIntensity    @default(standard)
+  startDate             DateTime             @db.Date
+  endDate               DateTime?            @db.Date
+  tdee                  Int?
+  targetCalories        Int?
+  proteinGrams          Int?
+  fastingWindow         Json?
+  carbCycleConfig       Json?
+  expectedLossKgPerWeek Float
+  stageGoal             String
+  recommendationReasons Json
+  scoreBreakdown        Json
+  safetyFlags           Json
+  source                String              @default("strategy_engine_v1")
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, strategyType])
+}
+
+model StrategyExecutionSnapshot {
+  id              String   @id @default(cuid())
+  userId          String
+  strategyId      String
+  date            DateTime @db.Date
+  executionRate   Float
+  calorieHitRate  Float?
+  proteinHitRate  Float?
+  fastingHitRate  Float?
+  trainingHitRate Float?
+  bingeCount      Int      @default(0)
+  plateauStatus   String
+  metrics         Json
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, strategyId])
+}
+
+model StrategyAdjustmentProposal {
+  id               String                   @id @default(cuid())
+  userId           String
+  fromStrategyId   String?
+  toStrategyType   FatLossStrategyType?
+  status           StrategyAdjustmentStatus @default(pending)
+  title            String
+  summary          String                   @db.Text
+  reason           Json
+  diffPreview      Json
+  actionProposalId String?
+  createdAt        DateTime                 @default(now())
+  decidedAt        DateTime?
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
 }
 
 model ChatMessage {

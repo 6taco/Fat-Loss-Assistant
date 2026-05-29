@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogIn, Plus, UserRound } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -13,8 +13,12 @@ import { UserProfile } from '@/lib/mock-data';
 
 export default function AccountsPage() {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<Account[]>(() => getAccounts().sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt)));
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [name, setName] = useState('');
+
+  useEffect(() => {
+    setAccounts(getSortedAccounts());
+  }, []);
 
   const goNext = (accountId: string) => {
     const user = getItem<UserProfile | null>(`fla:${accountId}:${KEYS.USER}`, null);
@@ -106,4 +110,8 @@ export default function AccountsPage() {
       )}
     </div>
   );
+}
+
+function getSortedAccounts() {
+  return getAccounts().sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
 }

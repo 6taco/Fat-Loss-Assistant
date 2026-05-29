@@ -8,11 +8,13 @@ import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { track } from '@/lib/analytics/client';
+import { groupMealsByType } from '@/lib/meal-groups';
 import { calculateMealCalories, type FoodItem, type MealLog, mealTypeLabels, type MealType, sumMealMacros } from '@/lib/mock-data';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useUserStore } from '@/stores/useUserStore';
+import { getTodayIso } from '@/lib/date-utils';
 
-const todayIso = new Date().toISOString().slice(0, 10);
 const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const maxPhotoSize = 5 * 1024 * 1024;
 
@@ -33,6 +35,7 @@ interface EstimateResponse {
 }
 
 export default function MealsPage() {
+  const { user } = useUserStore();
   const { meals, loadMeals, addMeal, deleteMeal } = useMealStore();
   const { plans, loadPlans } = usePlanStore();
   const [mealType, setMealType] = useState<MealType>('breakfast');
@@ -52,10 +55,16 @@ export default function MealsPage() {
   const [editMode, setEditMode] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
+  // 在组件内部计算今天的日期，确保每次渲染都是最新的
+  const todayIso = useMemo(() => getTodayIso(), []);
+
+  // 等待用户数据加载完成后再加载饮食记录
   useEffect(() => {
-    loadMeals();
-    loadPlans();
-  }, [loadMeals, loadPlans]);
+    if (user?.id) {
+      loadMeals();
+      loadPlans();
+    }
+  }, [user?.id, loadMeals, loadPlans]);
 
   useEffect(() => {
     return () => {
@@ -63,8 +72,16 @@ export default function MealsPage() {
     };
   }, [photoPreviewUrl]);
 
-  const todayMeals = useMemo(() => meals.filter(meal => meal.date === todayIso), [meals]);
+  const todayMeals = useMemo(() => {
+    console.log('[MealsPage] todayIso:', todayIso);
+    console.log('[MealsPage] Total meals:', meals.length);
+    console.log('[MealsPage] All meal dates:', meals.map(m => m.date));
+    const filtered = meals.filter(meal => meal.date === todayIso);
+    console.log('[MealsPage] Filtered today meals:', filtered.length);
+    return filtered;
+  }, [meals, todayIso]);
   const summary = useMemo(() => sumMealMacros(todayMeals), [todayMeals]);
+  const todayMealGroups = useMemo(() => groupMealsByType(todayMeals), [todayMeals]);
   const todayPlan = plans.find(plan => plan.date === todayIso);
   const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0 || calories > 0);
   const isWorking = isEstimating || isRecognizingPhoto;
@@ -375,21 +392,31 @@ export default function MealsPage() {
 
       <p className="text-[13px] text-text-secondary font-medium mb-3">今日餐次</p>
       <div className="flex flex-col gap-2.5">
-        {todayMeals.length > 0 ? todayMeals.map(meal => (
-          <GlassCard key={meal.id} padding="px-4 py-3">
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold">{mealTypeLabels[meal.mealType]} · {meal.calories ?? calculateMealCalories(meal)} kcal</p>
-                <p className="text-[12px] text-text-secondary mt-1 line-clamp-2">{meal.description}</p>
+        {todayMealGroups.length > 0 ? todayMealGroups.map(group => (
+          <GlassCard key={group.mealType} padding="px-4 py-3">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <p className="text-[14px] font-semibold">{mealTypeLabels[group.mealType]} · {Math.round(group.summary.calories)} kcal</p>
+                <p className="text-[11px] text-text-tertiary mt-1">{group.meals.length} 条记录</p>
               </div>
-              <button onClick={() => deleteMeal(meal.id)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center shrink-0" aria-label="删除">
-                <Trash2 size={14} className="text-text-tertiary" />
-              </button>
+              <div className="grid grid-cols-3 gap-2 text-right text-[11px] text-text-secondary shrink-0">
+                <span>碳水 {Math.round(group.summary.carb)}g</span>
+                <span>蛋白 {Math.round(group.summary.protein)}g</span>
+                <span>脂肪 {Math.round(group.summary.fat)}g</span>
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-[12px] text-text-secondary">
-              <span>碳水 {meal.carb}g</span>
-              <span>蛋白 {meal.protein}g</span>
-              <span>脂肪 {meal.fat}g</span>
+            <div className="flex flex-col gap-2">
+              {group.meals.map(meal => (
+                <div key={meal.id} className="flex items-start justify-between gap-3 rounded-xl bg-white/[0.04] px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[12px] text-text-secondary line-clamp-2">{meal.description}</p>
+                    <p className="text-[10px] text-text-tertiary mt-1">{meal.calories ?? calculateMealCalories(meal)} kcal</p>
+                  </div>
+                  <button onClick={() => deleteMeal(meal.id)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center shrink-0" aria-label="删除">
+                    <Trash2 size={14} className="text-text-tertiary" />
+                  </button>
+                </div>
+              ))}
             </div>
           </GlassCard>
         )) : (

@@ -37,10 +37,16 @@ export default function ToastHost() {
   }, [toast]);
 
   const borderColor = toast?.type === 'error'
-    ? 'rgba(255,69,58,0.35)'
+    ? 'rgba(243,138,91,0.38)'
     : toast?.type === 'success'
-      ? 'rgba(48,209,88,0.35)'
-      : 'rgba(10,132,255,0.35)';
+      ? 'rgba(103,181,107,0.42)'
+      : 'rgba(104,137,201,0.34)';
+
+  const accentColor = toast?.type === 'error'
+    ? '#F38A5B'
+    : toast?.type === 'success'
+      ? '#67B56B'
+      : '#6889C9';
 
   return (
     <AnimatePresence>
@@ -53,10 +59,11 @@ export default function ToastHost() {
           className="fixed left-0 right-0 bottom-[96px] z-[80] px-5 pointer-events-none"
         >
           <div
-            className="max-w-[390px] mx-auto rounded-xl px-4 py-3 text-[13px] text-text-primary shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
+            className="max-w-[390px] mx-auto rounded-xl px-4 py-3 text-[13px] font-medium text-text-primary shadow-[0_14px_38px_rgba(104,83,55,0.16)]"
             style={{
-              background: 'rgba(18,18,26,0.96)',
+              background: 'rgba(255,253,248,0.96)',
               border: `1px solid ${borderColor}`,
+              borderLeft: `4px solid ${accentColor}`,
               backdropFilter: 'blur(20px)',
             }}
           >

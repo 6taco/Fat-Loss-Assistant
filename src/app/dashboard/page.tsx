@@ -1,11 +1,24 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
-import { Brain, CheckCircle2, FileText, Inbox, MessageSquare, Scale, Settings, Share2, TrendingDown, Utensils } from 'lucide-react';
+import {
+  Brain,
+  CheckCircle2,
+  FileText,
+  Inbox,
+  MessageSquare,
+  Scale,
+  Settings,
+  Share2,
+  Sparkles,
+  TrendingDown,
+  Utensils,
+  type LucideIcon,
+} from 'lucide-react';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
@@ -17,9 +30,20 @@ import { getItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useReportInboxStore } from '@/stores/useReportInboxStore';
+import { useStrategyStore } from '@/stores/useStrategyStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { CarbType, DailyReport, WeightEntry, WeeklyReport, carbColors, getFatBurnIndex, getTodayPlan, mockUser } from '@/lib/mock-data';
+import {
+  carbColors,
+  getFatBurnIndex,
+  getTodayPlan,
+  mockUser,
+  type CarbType,
+  type DailyReport,
+  type UserProfile,
+  type WeightEntry,
+  type WeeklyReport,
+} from '@/lib/mock-data';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -42,6 +66,7 @@ export default function DashboardPage() {
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
   const { loadMeals, getDailySummary } = useMealStore();
   const { dailyReports, weeklyReports, isLoading: reportsLoading, loadReports, generateWeeklyReport, markRead } = useReportInboxStore();
+  const { currentStrategy, recommendation, proposals: strategyProposals, executionRate, loadCurrent: loadStrategy, recheck: recheckStrategy } = useStrategyStore();
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
@@ -63,23 +88,24 @@ export default function DashboardPage() {
     loadEntries();
     loadMeals();
     loadReports();
-  }, [loadUser, loadPlans, loadEntries, loadMeals, loadReports, router]);
+    loadStrategy();
+  }, [loadUser, loadPlans, loadEntries, loadMeals, loadReports, loadStrategy, router]);
 
-  const u = user || mockUser;
+  const profile = user || mockUser;
   const todayPlan = getTodayPlan(plans);
   const color = todayPlan ? carbColors[todayPlan.carbType] : carbColors.low;
   const burnIndex = todayPlan ? getFatBurnIndex(todayPlan.carbType, todayPlan.completed) : 0;
   const mealSummary = getDailySummary(todayIso);
-  const weights = useMemo(() => mergeInitialWeight(u, weightEntries), [u, weightEntries]);
+  const weights = useMemo(() => mergeInitialWeight(profile, weightEntries), [profile, weightEntries]);
   const latestWeight = weights[weights.length - 1];
   const prevWeight = weights.length >= 3 ? weights[weights.length - 3] : weights[0];
-  const weightDiff = latestWeight && prevWeight ? (latestWeight.weight - prevWeight.weight).toFixed(1) : '0';
+  const weightDiff = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : 0;
   const chartEntries = weights.slice(-7);
   const chartWeights = chartEntries.map(entry => entry.weight);
-  const minChartWeight = chartWeights.length ? Math.min(...chartWeights) : u.weight - 1;
-  const maxChartWeight = chartWeights.length ? Math.max(...chartWeights) : u.weight + 1;
+  const minChartWeight = chartWeights.length ? Math.min(...chartWeights) : profile.weight - 1;
+  const maxChartWeight = chartWeights.length ? Math.max(...chartWeights) : profile.weight + 1;
   const chartRange = Math.max(0.1, maxChartWeight - minChartWeight);
-  const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(u.startDate).getTime()) / 86400000) + 1);
+  const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(profile.startDate).getTime()) / 86400000) + 1);
   const hasUnreadReports = dailyReports.some(report => !report.readAt) || weeklyReports.some(report => !report.readAt);
 
   const saveWeight = () => {
@@ -108,7 +134,7 @@ export default function DashboardPage() {
 
       <div className="relative z-10 flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.2px]">Hi, {u.name}</h1>
+          <h1 className="text-[22px] font-semibold tracking-[-0.2px]">Hi, {profile.name}</h1>
           <p className="text-[13px] text-text-tertiary mt-1">今天是你执行计划的第 {dayCount} 天</p>
         </div>
         <div className="flex gap-2">
@@ -133,6 +159,38 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {(currentStrategy || recommendation) && (
+        <GlassCard variant="highlight" className="mb-3 relative z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles size={15} className="text-accent-blue" />
+              <span className="text-[13px] font-medium">AI 减脂策略</span>
+            </div>
+            <button onClick={() => void recheckStrategy()} className="text-[11px] text-accent-blue bg-transparent border-none">
+              重新评估
+            </button>
+          </div>
+          <div className="flex items-end justify-between gap-4 mb-3">
+            <div>
+              <p className="text-[24px] font-bold">{strategyLabel(currentStrategy?.strategyType || recommendation?.strategyType)}</p>
+              <p className="text-[12px] text-text-tertiary mt-1">{currentStrategy?.stageGoal || recommendation?.stageGoal}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-[20px] font-bold text-carb-low">{executionRate}%</p>
+              <p className="text-[10px] text-text-tertiary">执行率</p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-white/55 border border-border-glass px-3 py-2.5">
+            <p className="text-[12px] text-text-secondary leading-relaxed">
+              {currentStrategy?.recommendationReasons?.[0] || recommendation?.reasons?.[0] || recommendation?.userFacingMessage || 'AI 会根据你的画像、记录和进度动态调整策略。'}
+            </p>
+          </div>
+          {strategyProposals[0] && (
+            <p className="text-[12px] text-carb-high mt-3">{strategyProposals[0].title}：{strategyProposals[0].summary}</p>
+          )}
+        </GlassCard>
+      )}
 
       {todayPlan && (
         <GlassCard variant="highlight" className="mb-3 relative z-10">
@@ -162,17 +220,17 @@ export default function DashboardPage() {
                 centerValue={todayPlan.calories.toLocaleString()}
                 centerLabel="kcal"
                 rings={[
-                  { value: 40, color: '#0A84FF', label: '碳水', current: `${Math.round(mealSummary.carb)}`, target: `${todayPlan.carb}g` },
-                  { value: 62, color: '#30D158', label: '蛋白', current: `${Math.round(mealSummary.protein)}`, target: `${todayPlan.protein}g` },
-                  { value: 51, color: '#FFD60A', label: '脂肪', current: `${Math.round(mealSummary.fat)}`, target: `${todayPlan.fat}g` },
+                  { value: macroPercent(mealSummary.carb, todayPlan.carb), color: '#68B96C', label: '碳水', current: `${Math.round(mealSummary.carb)}`, target: `${todayPlan.carb}g` },
+                  { value: macroPercent(mealSummary.protein, todayPlan.protein), color: '#67B56B', label: '蛋白', current: `${Math.round(mealSummary.protein)}`, target: `${todayPlan.protein}g` },
+                  { value: macroPercent(mealSummary.fat, todayPlan.fat), color: '#F0B56E', label: '脂肪', current: `${Math.round(mealSummary.fat)}`, target: `${todayPlan.fat}g` },
                 ]}
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(10,132,255,0.06)', border: '1px solid rgba(10,132,255,0.12)' }}>
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/55 border border-border-glass">
             <Brain size={14} className="text-accent-blue flex-shrink-0" />
-            <p className="text-[12px] text-accent-blue font-medium">{carbTip[todayPlan.carbType]}</p>
+            <p className="text-[12px] text-text-secondary font-medium">{carbTip[todayPlan.carbType]}</p>
           </div>
         </GlassCard>
       )}
@@ -189,9 +247,9 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <IntakeStat label="碳水" current={mealSummary.carb} target={todayPlan.carb} color="#0A84FF" />
-            <IntakeStat label="蛋白" current={mealSummary.protein} target={todayPlan.protein} color="#30D158" />
-            <IntakeStat label="脂肪" current={mealSummary.fat} target={todayPlan.fat} color="#FFD60A" />
+            <IntakeStat label="碳水" current={mealSummary.carb} target={todayPlan.carb} color="#68B96C" />
+            <IntakeStat label="蛋白" current={mealSummary.protein} target={todayPlan.protein} color="#67B56B" />
+            <IntakeStat label="脂肪" current={mealSummary.fat} target={todayPlan.fat} color="#F0B56E" />
           </div>
         </GlassCard>
       )}
@@ -211,7 +269,7 @@ export default function DashboardPage() {
               <motion.div
                 key={`${entry.date}-${index}`}
                 className="flex-1 rounded-sm"
-                style={{ background: index === chartEntries.length - 1 ? '#0A84FF' : 'rgba(255,255,255,0.08)' }}
+                style={{ background: index === chartEntries.length - 1 ? '#68B96C' : 'rgba(96,74,48,0.08)' }}
                 initial={{ height: 0 }}
                 animate={{ height: `${Math.max(10, height)}%` }}
                 transition={{ duration: 0.5, delay: index * 0.05 }}
@@ -220,20 +278,20 @@ export default function DashboardPage() {
           })}
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-[20px] font-bold">{latestWeight?.weight ?? u.weight} kg</span>
-          <span className={`text-[12px] font-medium ${Number(weightDiff) <= 0 ? 'text-carb-low' : 'text-carb-high'}`}>
-            {Number(weightDiff) <= 0 ? '下降' : '上升'} {Math.abs(Number(weightDiff))} kg
+          <span className="text-[20px] font-bold">{latestWeight?.weight ?? profile.weight} kg</span>
+          <span className={`text-[12px] font-medium ${weightDiff <= 0 ? 'text-carb-low' : 'text-carb-high'}`}>
+            {weightDiff <= 0 ? '下降' : '上升'} {Math.abs(weightDiff).toFixed(1)} kg
           </span>
         </div>
       </GlassCard>
 
       <div className="grid grid-cols-3 gap-3 relative z-10">
-        <ActionCard icon={Scale} label="记体重" color="#0A84FF" onClick={() => setShowWeightInput(true)} />
-        <ActionCard icon={MessageSquare} label="问 AI" color="#5E5CE6" onClick={() => router.push('/chat')} />
+        <ActionCard icon={Scale} label="记体重" color="#68B96C" onClick={() => setShowWeightInput(true)} />
+        <ActionCard icon={MessageSquare} label="问 AI" color="#F0B56E" onClick={() => router.push('/chat')} />
         <ActionCard
           icon={CheckCircle2}
           label={todayPlan?.completed ? '已完成' : '今日完成'}
-          color="#30D158"
+          color="#67B56B"
           onClick={() => {
             if (!todayPlan) return;
             toggleComplete(todayPlan.date);
@@ -251,14 +309,14 @@ export default function DashboardPage() {
               step="0.1"
               value={weightValue}
               onChange={(event) => setWeightValue(event.target.value)}
-              placeholder={String(latestWeight?.weight || u.weight)}
-              className="flex-1 bg-transparent border border-white/10 rounded-xl px-4 py-3 text-[18px] font-bold text-text-primary outline-none focus:border-accent-blue transition-colors"
+              placeholder={String(latestWeight?.weight || profile.weight)}
+              className="flex-1 bg-transparent border border-border-glass rounded-xl px-4 py-3 text-[18px] font-bold text-text-primary outline-none focus:border-accent-blue transition-colors"
               autoFocus
             />
             <span className="text-[14px] text-text-tertiary">kg</span>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setShowWeightInput(false)} className="flex-1 py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer">
+            <button onClick={() => setShowWeightInput(false)} className="flex-1 py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer">
               取消
             </button>
             <button onClick={saveWeight} className="flex-1 py-3 rounded-xl gradient-accent text-white text-[14px] font-medium cursor-pointer border-none">
@@ -285,7 +343,7 @@ export default function DashboardPage() {
             >
               导出 JSON
             </button>
-            <button onClick={() => router.push('/onboarding')} className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer">
+            <button onClick={() => router.push('/onboarding')} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer">
               重新填写信息
             </button>
             <button
@@ -293,7 +351,7 @@ export default function DashboardPage() {
                 setShowSettings(false);
                 router.push('/accounts');
               }}
-              className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer"
+              className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
             >
               切换账户
             </button>
@@ -303,7 +361,7 @@ export default function DashboardPage() {
                 showAppToast('已退出当前账户。', 'success');
                 router.push('/accounts');
               }}
-              className="py-3 rounded-xl border border-white/10 bg-transparent text-text-secondary text-[14px] cursor-pointer"
+              className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
             >
               退出当前账户
             </button>
@@ -313,11 +371,11 @@ export default function DashboardPage() {
                 showAppToast('本地数据已清除。', 'success');
                 router.push('/onboarding');
               }}
-              className="py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-200 text-[14px] cursor-pointer"
+              className="py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 text-[14px] cursor-pointer"
             >
               清除本地数据
             </button>
-            <button onClick={() => setShowSettings(false)} className="py-3 rounded-xl border border-white/10 bg-transparent text-text-tertiary text-[14px] cursor-pointer">
+            <button onClick={() => setShowSettings(false)} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-tertiary text-[14px] cursor-pointer">
               关闭
             </button>
           </div>
@@ -380,9 +438,9 @@ function ReportInboxModal({
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="text-[16px] font-semibold">报告收件箱</p>
-              <p className="text-[11px] text-text-tertiary mt-1">日报与周报都会放在这里</p>
+              <p className="text-[11px] text-text-tertiary mt-1">日报和周报会自动汇总在这里</p>
             </div>
-            <button onClick={onGenerateWeekly} disabled={isLoading} className="rounded-full px-3 py-2 bg-white/[0.06] border border-white/10 text-[12px] text-text-secondary">
+            <button onClick={onGenerateWeekly} disabled={isLoading} className="rounded-full px-3 py-2 bg-white/55 border border-border-glass text-[12px] text-text-secondary">
               生成周报
             </button>
           </div>
@@ -403,7 +461,7 @@ function ReportInboxModal({
               <ReportListItem
                 key={report.id}
                 title={`${formatDate(report.date)} · ${report.score} 分`}
-                subtitle="每日收盘复盘"
+                subtitle="每日复盘"
                 summary={report.summary}
                 unread={!report.readAt}
                 onClick={() => onSelect({ type: 'daily', report })}
@@ -420,13 +478,13 @@ function ReportInboxModal({
   );
 }
 
-function ReportSection({ title, empty, children }: { title: string; empty: string; children: React.ReactNode }) {
+function ReportSection({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
   const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
   return (
     <div className="mb-5">
       <p className="text-[13px] text-text-secondary font-medium mb-2">{title}</p>
       <div className="flex flex-col gap-2">
-        {hasChildren ? children : <p className="text-[12px] text-text-tertiary rounded-xl bg-white/[0.04] border border-white/10 px-3 py-3">{empty}</p>}
+        {hasChildren ? children : <p className="text-[12px] text-text-tertiary rounded-xl bg-white/55 border border-border-glass px-3 py-3">{empty}</p>}
       </div>
     </div>
   );
@@ -434,7 +492,7 @@ function ReportSection({ title, empty, children }: { title: string; empty: strin
 
 function ReportListItem({ title, subtitle, summary, unread, onClick }: { title: string; subtitle: string; summary: string; unread: boolean; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3 py-3 text-left">
+    <button onClick={onClick} className="w-full rounded-xl border border-border-glass bg-white/55 px-3 py-3 text-left">
       <div className="flex items-center justify-between gap-2 mb-1">
         <p className="text-[13px] font-semibold">{title}</p>
         {unread && <span className="w-2 h-2 rounded-full bg-carb-high shrink-0" />}
@@ -472,7 +530,7 @@ function WeeklyReportDetail({ report, onBack }: { report: WeeklyReport; onBack: 
         <button onClick={exportPdf} className="rounded-xl py-3 gradient-accent text-white text-[13px] flex items-center justify-center gap-2">
           <FileText size={14} /> 导出 PDF
         </button>
-        <button onClick={exportPoster} className="rounded-xl py-3 border border-white/10 bg-white/[0.05] text-text-secondary text-[13px] flex items-center justify-center gap-2">
+        <button onClick={exportPoster} className="rounded-xl py-3 border border-border-glass bg-white/55 text-text-secondary text-[13px] flex items-center justify-center gap-2">
           <Share2 size={14} /> 分享海报
         </button>
       </div>
@@ -481,39 +539,46 @@ function WeeklyReportDetail({ report, onBack }: { report: WeeklyReport; onBack: 
 }
 
 function WeeklyReportPrintableCard({ report, printableId }: { report: WeeklyReport; printableId: string }) {
-  const m = report.metrics;
+  const metrics = report.metrics;
+  const weightChange = metrics.weightChange !== undefined ? Math.abs(metrics.weightChange).toFixed(1) : '--';
+  const weightTrend = metrics.weightChange !== undefined && metrics.weightChange <= 0 ? '本周减重' : '本周变化';
+
   return (
-    <div id={printableId} className="rounded-2xl bg-[#0A0A0F] border border-white/10 p-5 text-white" style={{ width: 360, minHeight: 480 }}>
-      <p className="text-[12px] text-white/45 mb-1">Fat Loss Assistant</p>
-      <h2 className="text-[22px] font-bold mb-1">AI 减脂周报</h2>
-      <p className="text-[12px] text-white/45 mb-5">{formatDate(report.startDate)} - {formatDate(report.endDate)}</p>
+    <div
+      id={printableId}
+      className="rounded-2xl border border-border-glass-strong bg-[#FFFDF8] p-5 text-text-primary shadow-[0_18px_45px_rgba(104,83,55,0.12)]"
+      style={{ width: 360, minHeight: 480 }}
+    >
+      <p className="text-[12px] text-text-tertiary mb-1">Fat Loss Assistant</p>
+      <h2 className="text-[23px] font-bold mb-1">AI 减脂周报</h2>
+      <p className="text-[12px] text-text-tertiary mb-5">{formatDate(report.startDate)} - {formatDate(report.endDate)}</p>
       <div className="flex items-end justify-between mb-5">
         <div>
-          <p className="text-[12px] text-white/45 mb-1">本周评分</p>
-          <p className="text-[46px] font-bold text-accent-blue leading-none">{report.score}</p>
+          <p className="text-[12px] text-text-tertiary mb-1">本周评分</p>
+          <p className="text-[48px] font-bold text-carb-low leading-none">{report.score}</p>
         </div>
         <div className="text-right">
-          <p className="text-[12px] text-white/45 mb-1">本周减重</p>
-          <p className="text-[24px] font-bold">{m.weightChange !== undefined ? `${m.weightChange.toFixed(1)}kg` : '--'}</p>
+          <p className="text-[12px] text-text-tertiary mb-1">{weightTrend}</p>
+          <p className="text-[26px] font-bold">{weightChange === '--' ? '--' : `${weightChange}kg`}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-4">
-        <PosterMetric label="体重" value={m.startWeight && m.endWeight ? `${m.startWeight} -> ${m.endWeight}kg` : '--'} />
-        <PosterMetric label="平均热量" value={`${m.averageCalories} kcal`} />
-        <PosterMetric label="蛋白达标" value={`${m.proteinHitRate}%`} />
-        <PosterMetric label="连续打卡" value={`${m.longestStreak} 天`} />
+        <PosterMetric label="体重" value={metrics.startWeight && metrics.endWeight ? `${metrics.startWeight} -> ${metrics.endWeight}kg` : '--'} />
+        <PosterMetric label="平均热量" value={`${metrics.averageCalories} kcal`} />
+        <PosterMetric label="蛋白达标" value={`${metrics.proteinHitRate}%`} />
+        <PosterMetric label="连续打卡" value={`${metrics.longestStreak} 天`} />
       </div>
-      <p className="text-[15px] leading-relaxed mb-4">{report.headline || report.summary}</p>
-      <p className="text-[13px] text-white/65 leading-relaxed">{report.suggestions[0] || '下周继续保持记录节奏。'}</p>
-      {m.predictionDays && <p className="text-[12px] text-carb-low mt-4">预计 {m.predictionDays} 天后达到目标体重</p>}
+      <p className="text-[15px] font-semibold leading-relaxed mb-4">{report.headline || report.summary}</p>
+      <p className="text-[13px] text-text-secondary leading-relaxed">{report.suggestions[0] || '下周继续保持记录节奏。'}</p>
+      {metrics.predictionDays && <p className="text-[12px] text-carb-low mt-4">预计 {metrics.predictionDays} 天后达到目标体重</p>}
     </div>
   );
 }
 
 function PosterMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-white/[0.06] border border-white/10 px-3 py-2">
-      <p className="text-[10px] text-white/40 mb-1">{label}</p>
+    <div className="rounded-xl bg-glass border border-border-glass px-3 py-2">
+      <p className="text-[10px] text-text-tertiary mb-1">{label}</p>
       <p className="text-[13px] font-semibold">{value}</p>
     </div>
   );
@@ -523,12 +588,12 @@ function DailyReportDetail({ report, onBack }: { report: DailyReport; onBack: ()
   return (
     <div>
       <button onClick={onBack} className="text-[12px] text-accent-blue mb-3">返回收件箱</button>
-      <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+      <div className="rounded-2xl border border-border-glass bg-glass p-4">
         <p className="text-[16px] font-semibold mb-1">{formatDate(report.date)} 日报 · {report.score} 分</p>
         <p className="text-[13px] text-text-secondary leading-relaxed mt-3">{report.summary}</p>
         <div className="flex flex-col gap-2 mt-4">
           {report.suggestions.map((item, index) => (
-            <p key={index} className="rounded-xl bg-black/10 border border-white/10 px-3 py-2 text-[12px] text-text-secondary">{item}</p>
+            <p key={index} className="rounded-xl bg-white/55 border border-border-glass px-3 py-2 text-[12px] text-text-secondary">{item}</p>
           ))}
         </div>
       </div>
@@ -536,17 +601,7 @@ function DailyReportDetail({ report, onBack }: { report: DailyReport; onBack: ()
   );
 }
 
-function ActionCard({
-  icon: Icon,
-  label,
-  color,
-  onClick,
-}: {
-  icon: typeof Scale;
-  label: string;
-  color: string;
-  onClick: () => void;
-}) {
+function ActionCard({ icon: Icon, label, color, onClick }: { icon: LucideIcon; label: string; color: string; onClick: () => void }) {
   return (
     <GlassCard padding="p-3" className="flex flex-col items-center gap-2 cursor-pointer" whileTap={{ scale: 0.95 }} onClick={onClick}>
       <Icon size={20} style={{ color }} />
@@ -560,7 +615,7 @@ function ModalBackdrop({
   onClose,
   maxWidth = 'max-w-[320px]',
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClose: () => void;
   maxWidth?: string;
 }) {
@@ -569,7 +624,7 @@ function ModalBackdrop({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="fixed inset-0 z-50 flex items-center justify-center px-8"
-      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(42,38,31,0.38)', backdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
       <motion.div
@@ -585,7 +640,7 @@ function ModalBackdrop({
   );
 }
 
-function mergeInitialWeight(user: typeof mockUser, entries: WeightEntry[]): WeightEntry[] {
+function mergeInitialWeight(user: UserProfile, entries: WeightEntry[]): WeightEntry[] {
   const initialEntry = {
     date: user.initialWeightDate || user.startDate,
     weight: user.weight,
@@ -619,4 +674,15 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 function formatDate(date: string): string {
   const [, month, day] = date.split('-');
   return `${month}/${day}`;
+}
+
+function macroPercent(current: number, target: number) {
+  return target > 0 ? Math.min(100, Math.max(0, Math.round((current / target) * 100))) : 0;
+}
+
+function strategyLabel(strategyType?: string): string {
+  if (strategyType === 'calorie_deficit') return '热量缺口';
+  if (strategyType === 'if_16_8') return '16+8 轻断食';
+  if (strategyType === 'carb_cycling') return '碳循环';
+  return '策略分析';
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { upsertSentReportNotification } from '@/lib/report-notification-store';
+import { buildWeeklyReportNotification } from '@/lib/report-notifications';
 import { dateToISODate } from '@/lib/server-mappers';
 import { generateWeeklyReport, getPreviousClosedWeekIndex } from '@/lib/weekly-report';
 
@@ -17,6 +19,7 @@ export async function GET(request: NextRequest) {
   let generated = 0;
   let skipped = 0;
   let failed = 0;
+  let notified = 0;
 
   for (const user of users) {
     const weekIndex = getPreviousClosedWeekIndex(dateToISODate(user.startDate));
@@ -29,7 +32,16 @@ export async function GET(request: NextRequest) {
       const before = await prisma.weeklyReport.findUnique({
         where: { userId_weekIndex: { userId: user.id, weekIndex } },
       });
-      await generateWeeklyReport(user.id, weekIndex, false);
+      const report = await generateWeeklyReport(user.id, weekIndex, false);
+      await upsertSentReportNotification(buildWeeklyReportNotification({
+        userId: user.id,
+        reportId: report.id,
+        weekIndex: report.weekIndex,
+        startDate: report.startDate,
+        endDate: report.endDate,
+        score: report.score,
+      }));
+      notified += 1;
       if (before) skipped += 1;
       else generated += 1;
     } catch {
@@ -37,5 +49,5 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ generated, skipped, failed });
+  return NextResponse.json({ generated, skipped, notified, failed });
 }

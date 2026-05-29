@@ -6,7 +6,15 @@
     },
     {
       "path": "/api/cron/weekly-reports",
-      "schedule": "20 16 * * *"
+      "schedule": "20 16 * * 0"
+    },
+    {
+      "path": "/api/cron/coach-daily",
+      "schedule": "30 13 * * *"
+    },
+    {
+      "path": "/api/cron/coach-weekly",
+      "schedule": "40 16 * * 0"
     }
   ]
 }

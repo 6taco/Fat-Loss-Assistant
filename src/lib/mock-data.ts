@@ -1,4 +1,5 @@
 export type CarbType = 'high' | 'mid' | 'low';
+export type FatLossStrategyType = 'calorie_deficit' | 'if_16_8' | 'carb_cycling';
 export type Somatotype = 'endomorph' | 'mesomorph' | 'ectomorph';
 export type MuscleGroup = 'legs' | 'back' | 'chest' | 'shoulders' | 'arms' | 'core' | 'cardio' | 'rest';
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -36,6 +37,10 @@ export interface DayPlan {
   protein: number;
   fat: number;
   completed: boolean;
+  strategyId?: string;
+  strategyType?: FatLossStrategyType;
+  fastingWindow?: unknown;
+  dayGoal?: unknown;
   muscleGroup?: MuscleGroup;
   trainingLabel?: string;
 }

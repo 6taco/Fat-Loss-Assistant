@@ -1,18 +1,20 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import AnalyticsProvider from '@/components/analytics/AnalyticsProvider';
+import DataInitProvider from '@/components/providers/DataInitProvider';
 import TabBar from '@/components/layout/TabBar';
 import ToastHost from '@/components/ui/ToastHost';
 
 export const metadata: Metadata = {
-  title: '减脂助手',
-  description: 'AI 碳循环计划、体重追踪与饮食记录助手',
+  title: '轻燃AI',
+  description: '轻盈明快的 AI 饮食、计划与体重管理助手',
   manifest: '/manifest.webmanifest',
-  applicationName: '减脂助手',
+  applicationName: '轻燃AI',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: '减脂助手',
+    statusBarStyle: 'default',
+    title: '轻燃AI',
   },
   icons: {
     icon: [
@@ -28,7 +30,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0A0A0F',
+  themeColor: '#FFF9F0',
 };
 
 export default function RootLayout({
@@ -40,12 +42,13 @@ export default function RootLayout({
     <html lang="zh-CN" className="h-full antialiased">
       <body className="min-h-dvh bg-bg-primary text-text-primary font-sans">
         <main className="max-w-[430px] mx-auto relative min-h-dvh">
+          <DataInitProvider />
           <AnalyticsProvider />
           {children}
         </main>
         <TabBar />
         <ToastHost />
-        <script src="/sw-register.js" defer />
+        <Script src="/sw-register.js" strategy="afterInteractive" />
       </body>
     </html>
   );

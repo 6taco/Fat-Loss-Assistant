@@ -20,7 +20,16 @@ export type AnalyticsEventName =
   | 'proposal_accept'
   | 'proposal_dismiss'
   | 'proposal_edit'
-  | 'proposal_expire';
+  | 'proposal_expire'
+  | 'strategy_recommend_view'
+  | 'strategy_recommend_accept'
+  | 'strategy_recommend_dismiss'
+  | 'strategy_switch_proposed'
+  | 'strategy_switch_accept'
+  | 'strategy_day_goal_complete'
+  | 'fasting_window_complete'
+  | 'strategy_plateau_adjustment_proposed'
+  | 'binge_risk_detected';
 
 export interface AnalyticsContext {
   platform?: 'ios' | 'android' | 'desktop' | 'unknown';

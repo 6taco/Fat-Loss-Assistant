@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import { dayPlanToResponse, toDate } from '@/lib/server-mappers';
 import { DayPlan, mockPlan } from '@/lib/mock-data';
@@ -51,6 +52,10 @@ export async function POST(request: NextRequest) {
           protein: plan.protein,
           fat: plan.fat,
           completed: plan.completed,
+          strategyId: plan.strategyId,
+          strategyType: plan.strategyType || 'carb_cycling',
+          fastingWindow: plan.fastingWindow as Prisma.InputJsonValue | undefined,
+          dayGoal: plan.dayGoal as Prisma.InputJsonValue | undefined,
           muscleGroup: plan.muscleGroup,
           trainingLabel: plan.trainingLabel,
         },
@@ -61,6 +66,10 @@ export async function POST(request: NextRequest) {
           protein: plan.protein,
           fat: plan.fat,
           completed: plan.completed,
+          strategyId: plan.strategyId,
+          strategyType: plan.strategyType || 'carb_cycling',
+          fastingWindow: plan.fastingWindow as Prisma.InputJsonValue | undefined,
+          dayGoal: plan.dayGoal as Prisma.InputJsonValue | undefined,
           muscleGroup: plan.muscleGroup,
           trainingLabel: plan.trainingLabel,
         },

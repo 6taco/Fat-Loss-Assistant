@@ -4,7 +4,12 @@ export type ToolName =
   | 'generate_meal_plan'
   | 'generate_training_plan'
   | 'reorder_carb_cycle'
-  | 'create_shopping_list';
+  | 'create_shopping_list'
+  | 'recommend_fat_loss_strategy'
+  | 'activate_fat_loss_strategy'
+  | 'adjust_strategy_intensity'
+  | 'switch_fat_loss_strategy'
+  | 'generate_strategy_day_plans';
 
 export interface ToolCallDraft {
   toolName: ToolName;

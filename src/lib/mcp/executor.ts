@@ -1,6 +1,8 @@
 import { getPrisma } from '@/lib/prisma';
 import { dateToISODate, toDate } from '@/lib/server-mappers';
 import { generateMealPlans, generateShoppingList, generateTrainingPlan } from '@/lib/coach';
+import { activateStrategy } from '@/lib/strategy-engine/service';
+import type { FatLossStrategyType, StrategyIntensity } from '@/lib/strategy-engine/types';
 
 export async function executeToolProposal(proposalId: string, userId: string) {
   const prisma = getPrisma();
@@ -21,6 +23,20 @@ export async function executeToolProposal(proposalId: string, userId: string) {
       break;
     case 'create_shopping_list':
       await generateShoppingList(userId, startDate, days);
+      break;
+    case 'activate_fat_loss_strategy':
+    case 'adjust_strategy_intensity':
+    case 'switch_fat_loss_strategy':
+    case 'generate_strategy_day_plans':
+      await activateStrategy(userId, {
+        strategyType: asStrategyType(payload.strategyType),
+        intensity: asStrategyIntensity(payload.intensity),
+        startDate,
+      });
+      await prisma.strategyAdjustmentProposal.updateMany({
+        where: { actionProposalId: proposal.id, userId },
+        data: { status: 'accepted', decidedAt: new Date() },
+      }).catch(() => null);
       break;
     case 'update_weight_goal':
       await prisma.user.update({
@@ -83,6 +99,10 @@ export async function dismissToolProposal(proposalId: string, userId: string) {
     data: { status: 'dismissed', decidedAt: new Date(), executionState: 'failed' },
   });
   await logExecution(prisma, proposal.id, userId, proposal.toolName || proposal.type, 'dismissed', {});
+  await prisma.strategyAdjustmentProposal.updateMany({
+    where: { actionProposalId: proposal.id, userId },
+    data: { status: 'dismissed', decidedAt: new Date() },
+  }).catch(() => null);
   return updated;
 }
 
@@ -121,6 +141,16 @@ function asString(value: unknown) {
 
 function asNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function asStrategyType(value: unknown): FatLossStrategyType | undefined {
+  if (value === 'calorie_deficit' || value === 'if_16_8' || value === 'carb_cycling') return value;
+  return undefined;
+}
+
+function asStrategyIntensity(value: unknown): StrategyIntensity | undefined {
+  if (value === 'gentle' || value === 'standard' || value === 'aggressive') return value;
+  return undefined;
 }
 
 function addDays(date: string, days: number) {

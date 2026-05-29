@@ -7,7 +7,7 @@ import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 interface UserState {
   user: UserProfile | null;
   isOnboarded: boolean;
-  setUser: (user: UserProfile) => void;
+  setUser: (user: UserProfile) => Promise<void>;
   loadUser: () => void;
   clearUser: () => void;
 }
@@ -16,10 +16,10 @@ export const useUserStore = create<UserState>((set) => ({
   user: null,
   isOnboarded: false,
 
-  setUser: (user) => {
+  setUser: async (user) => {
     setItem(getScopedKey(KEYS.USER), user);
     set({ user, isOnboarded: true });
-    void sendJson<{ user: UserProfile }>('/api/users', 'POST', user);
+    await sendJson<{ user: UserProfile }>('/api/users', 'POST', user);
   },
 
   loadUser: () => {

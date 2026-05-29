@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import {
   chatToResponse,
@@ -27,32 +28,65 @@ export async function generateDigitalTwin(userId: string, options: { horizonDays
   const dataEndDate = range.endDate ? toDate(range.endDate) : null;
   const snapshotDate = range.endDate || dateToISODate(new Date());
 
-  await prisma.$executeRaw`
-    INSERT INTO digitaltwinprofile
-      (id, userId, version, generatedAt, dataStartDate, dataEndDate, dataQuality, persona, behaviorProfile, nutritionProfile, trainingProfile, plateauProfile, modelSummary, confidence, createdAt)
-    VALUES
-      (${profileId}, ${userId}, ${'digital-twin-v1'}, ${now}, ${dataStartDate}, ${dataEndDate}, ${toJsonText(features.dataQuality)}, ${toJsonText(features.persona)}, ${toJsonText(features.behaviorProfile)}, ${toJsonText(features.nutritionProfile)}, ${toJsonText(features.trainingProfile)}, ${toJsonText(features.plateauProfile)}, ${toJsonText(features.modelSummary)}, ${features.confidence}, ${now})
-  `;
+  await prisma.digitalTwinProfile.create({
+    data: {
+      id: profileId,
+      userId,
+      version: 'digital-twin-v1',
+      generatedAt: now,
+      dataStartDate,
+      dataEndDate,
+      dataQuality: toPrismaJson(features.dataQuality),
+      persona: toPrismaJson(features.persona),
+      behaviorProfile: toPrismaJson(features.behaviorProfile),
+      nutritionProfile: toPrismaJson(features.nutritionProfile),
+      trainingProfile: toPrismaJson(features.trainingProfile),
+      plateauProfile: toPrismaJson(features.plateauProfile),
+      modelSummary: toPrismaJson(features.modelSummary),
+      confidence: features.confidence,
+      createdAt: now,
+    },
+  });
 
   await Promise.all([7, 14, 30].map(windowDays => upsertFeatureSnapshotRaw(userId, snapshotDate, windowDays, features)));
 
   const predictionId = makeId('dtpdr');
-  await prisma.$executeRaw`
-    INSERT INTO digitaltwinprediction
-      (id, userId, profileId, scenarioId, horizonDays, currentWeight, predictedWeight, goalProbability, slopeKgPerDay, plateauRisk, forecast, assumptions, confidence, modelVersion, createdAt)
-    VALUES
-      (${predictionId}, ${userId}, ${profileId}, ${null}, ${horizonDays}, ${baseline.currentWeight}, ${baseline.predictedWeight ?? null}, ${baseline.goalProbability}, ${baseline.slopeKgPerDay}, ${baseline.plateauRisk}, ${toJsonText(baseline.forecast)}, ${toJsonText(baseline.assumptions)}, ${baseline.confidence}, ${baseline.modelVersion}, ${now})
-  `;
+  await prisma.digitalTwinPrediction.create({
+    data: {
+      id: predictionId,
+      userId,
+      profileId,
+      scenarioId: null,
+      horizonDays,
+      currentWeight: baseline.currentWeight,
+      predictedWeight: baseline.predictedWeight ?? null,
+      goalProbability: baseline.goalProbability,
+      slopeKgPerDay: baseline.slopeKgPerDay,
+      plateauRisk: baseline.plateauRisk,
+      forecast: toPrismaJson(baseline.forecast),
+      assumptions: toPrismaJson(baseline.assumptions),
+      confidence: baseline.confidence,
+      modelVersion: baseline.modelVersion,
+      createdAt: now,
+    },
+  });
 
   const scenarioRecords = [];
   for (const scenario of scenarios) {
     const scenarioId = makeId('dts');
-    await prisma.$executeRaw`
-      INSERT INTO digitaltwinscenario
-        (id, userId, profileId, type, title, assumptions, result, status, createdAt)
-      VALUES
-        (${scenarioId}, ${userId}, ${profileId}, ${scenario.type}, ${scenario.title}, ${toJsonText(scenario.assumptions)}, ${toJsonText(scenario.result || {})}, ${scenario.status}, ${now})
-    `;
+    await prisma.digitalTwinScenario.create({
+      data: {
+        id: scenarioId,
+        userId,
+        profileId,
+        type: scenario.type,
+        title: scenario.title,
+        assumptions: toPrismaJson(scenario.assumptions),
+        result: toPrismaJson(scenario.result || {}),
+        status: scenario.status,
+        createdAt: now,
+      },
+    });
     scenarioRecords.push({ ...scenario, id: scenarioId });
   }
 
@@ -80,29 +114,14 @@ export async function generateDigitalTwin(userId: string, options: { horizonDays
 
 export async function getLatestDigitalTwin(userId: string): Promise<DigitalTwinBundle | null> {
   const prisma = getPrisma();
-  const [profile] = await prisma.$queryRaw<RawProfileRecord[]>`
-    SELECT id, userId, version, generatedAt, dataStartDate, dataEndDate, dataQuality, persona, behaviorProfile, nutritionProfile, trainingProfile, plateauProfile, modelSummary, confidence
-    FROM digitaltwinprofile
-    WHERE userId = ${userId}
-    ORDER BY generatedAt DESC
-    LIMIT 1
-  `;
+  const profile = await prisma.digitalTwinProfile.findFirst({
+    where: { userId },
+    orderBy: { generatedAt: 'desc' },
+  });
   if (!profile) return null;
   const [prediction, scenarios] = await Promise.all([
-    prisma.$queryRaw<RawPredictionRecord[]>`
-      SELECT id, horizonDays, currentWeight, predictedWeight, goalProbability, slopeKgPerDay, plateauRisk, forecast, assumptions, confidence
-      FROM digitaltwinprediction
-      WHERE userId = ${userId} AND profileId = ${profile.id}
-      ORDER BY createdAt DESC
-      LIMIT 1
-    `.then(rows => rows[0]),
-    prisma.$queryRaw<RawScenarioRecord[]>`
-      SELECT id, type, title, assumptions, result, status
-      FROM digitaltwinscenario
-      WHERE userId = ${userId} AND profileId = ${profile.id}
-      ORDER BY createdAt ASC
-      LIMIT 8
-    `,
+    prisma.digitalTwinPrediction.findFirst({ where: { userId, profileId: profile.id }, orderBy: { createdAt: 'desc' } }),
+    prisma.digitalTwinScenario.findMany({ where: { userId, profileId: profile.id }, orderBy: { createdAt: 'asc' }, take: 8 }),
   ]);
   return {
     profile: profileRecordToDto(profile),
@@ -127,12 +146,19 @@ export async function simulateDigitalTwinScenario(userId: string, scenarioInput:
   };
   const scenario = simulateScenario(features, bundle.prediction, scenarioInput);
   const scenarioId = makeId('dts');
-  await prisma.$executeRaw`
-    INSERT INTO digitaltwinscenario
-      (id, userId, profileId, type, title, assumptions, result, status, createdAt)
-    VALUES
-      (${scenarioId}, ${userId}, ${bundle.profile.id || null}, ${scenario.type}, ${scenario.title}, ${toJsonText(scenario.assumptions)}, ${toJsonText(scenario.result || {})}, ${scenario.status}, ${new Date()})
-  `;
+  await prisma.digitalTwinScenario.create({
+    data: {
+      id: scenarioId,
+      userId,
+      profileId: bundle.profile.id || null,
+      type: scenario.type,
+      title: scenario.title,
+      assumptions: toPrismaJson(scenario.assumptions),
+      result: toPrismaJson(scenario.result || {}),
+      status: scenario.status,
+      createdAt: new Date(),
+    },
+  });
   return {
     scenario: { ...scenario, id: scenarioId },
     prediction: bundle.prediction,
@@ -142,13 +168,11 @@ export async function simulateDigitalTwinScenario(userId: string, scenarioInput:
 
 export async function listDigitalTwinScenarios(userId: string) {
   const prisma = getPrisma();
-  const scenarios = await prisma.$queryRaw<RawScenarioRecord[]>`
-    SELECT id, type, title, assumptions, result, status
-    FROM digitaltwinscenario
-    WHERE userId = ${userId}
-    ORDER BY createdAt DESC
-    LIMIT 30
-  `;
+  const scenarios = await prisma.digitalTwinScenario.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: 30,
+  });
   return scenarios.map(scenarioRecordToDto);
 }
 
@@ -326,15 +350,25 @@ type RawScenarioRecord = {
 
 async function upsertFeatureSnapshotRaw(userId: string, date: string, windowDays: number, features: unknown) {
   const prisma = getPrisma();
-  const id = makeId('dtfs');
-  const featureJson = toJsonText(features);
-  await prisma.$executeRaw`
-    INSERT INTO digitaltwinfeaturesnapshot
-      (id, userId, date, windowDays, features, createdAt)
-    VALUES
-      (${id}, ${userId}, ${toDate(date)}, ${windowDays}, ${featureJson}, ${new Date()})
-    ON DUPLICATE KEY UPDATE features = ${featureJson}
-  `;
+  await prisma.digitalTwinFeatureSnapshot.upsert({
+    where: {
+      userId_date_windowDays: {
+        userId,
+        date: toDate(date),
+        windowDays,
+      },
+    },
+    create: {
+      id: makeId('dtfs'),
+      userId,
+      date: toDate(date),
+      windowDays,
+      features: toPrismaJson(features),
+    },
+    update: {
+      features: toPrismaJson(features),
+    },
+  });
 }
 
 function makeId(prefix: string) {
@@ -343,6 +377,10 @@ function makeId(prefix: string) {
 
 function toJsonText(value: unknown): string {
   return JSON.stringify(value ?? null);
+}
+
+function toPrismaJson(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
 function parseJson(value: unknown): unknown {

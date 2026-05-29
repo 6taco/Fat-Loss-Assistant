@@ -14,7 +14,7 @@ const base = 'inline-flex items-center justify-center font-semibold transition-a
 
 const variants: Record<Variant, string> = {
   primary:
-    'gradient-accent text-white rounded-full h-[50px] px-8 text-[16px] shadow-[0_4px_20px_rgba(10,132,255,0.35)] active:brightness-90',
+    'gradient-accent text-white rounded-full h-[50px] px-8 text-[16px] shadow-[0_10px_24px_rgba(103,181,107,0.28)] active:brightness-95',
   secondary:
     'glass-card rounded-full h-[44px] px-6 text-[15px] text-text-primary',
   ghost:
