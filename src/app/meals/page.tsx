@@ -312,17 +312,17 @@ export default function MealsPage() {
           className="hidden"
         />
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="px-2 text-[13px]">
-            <Camera size={16} className="mr-1.5" />
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
+            <Camera size={14} />
             拍照
           </Button>
-          <Button variant="secondary" fullWidth onClick={estimate} disabled={isWorking} className="px-2 text-[13px]">
-            <Bot size={16} className="mr-1.5" />
+          <Button variant="secondary" fullWidth onClick={estimate} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
+            <Bot size={14} />
             {isEstimating ? '估算中' : 'AI 估算'}
           </Button>
-          <Button variant="secondary" fullWidth onClick={() => setEditMode(true)} disabled={isWorking} className="px-2 text-[13px]">
-            <Pencil size={16} className="mr-1.5" />
+          <Button variant="secondary" fullWidth onClick={() => setEditMode(true)} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
+            <Pencil size={14} />
             手动填写
           </Button>
         </div>
