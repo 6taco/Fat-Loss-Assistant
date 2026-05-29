@@ -104,21 +104,18 @@ export default function PWAInstallSheet() {
 
                 {/* App icon + title */}
                 <div className="flex items-center gap-4 mb-5">
-                  <div
+                  <img
+                    src="/icons/icon-192.png"
+                    alt="轻燃AI"
                     style={{
                       width: 56,
                       height: 56,
-                      borderRadius: 16,
-                      background: 'linear-gradient(135deg, #75C777 0%, #54A95D 52%, #F0B56E 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 6px 18px rgba(103,181,107,0.28)',
+                      borderRadius: 14,
+                      boxShadow: '0 6px 18px rgba(103,181,107,0.22)',
                       flexShrink: 0,
+                      objectFit: 'cover',
                     }}
-                  >
-                    <span style={{ fontSize: 26 }}>🔥</span>
-                  </div>
+                  />
                   <div>
                     <h2
                       style={{
