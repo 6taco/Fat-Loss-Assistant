@@ -228,6 +228,11 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-dvh px-5 pt-14 pb-10 flex flex-col">
+      {isLoading && (
+        <div className="fixed top-0 left-0 right-0 z-[100] h-[3px] overflow-hidden">
+          <div className="h-full bg-accent-blue animate-loading-bar" />
+        </div>
+      )}
       <div className="flex items-center justify-between mb-5">
         <button onClick={back} className="bg-transparent border-none cursor-pointer" aria-label="返回">
           <ChevronLeft size={24} className="text-text-secondary" />
@@ -327,7 +332,9 @@ export default function OnboardingPage() {
 
       <div className="mt-6">
         <Button fullWidth onClick={next} disabled={isLoading}>
-          {step === 5 ? '让 AI 判断适合我的策略' : step === 6 ? '确认并生成计划' : '下一步'}
+          {isLoading
+            ? (step === 5 ? 'AI 分析中...' : '生成计划中...')
+            : (step === 5 ? '让 AI 判断适合我的策略' : step === 6 ? '确认并生成计划' : '下一步')}
         </Button>
       </div>
     </div>
