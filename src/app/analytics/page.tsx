@@ -17,7 +17,7 @@ export default function AnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
 
   useEffect(() => {
-    void getJson<{ summary: AnalyticsSummary }>(`/api/analytics/summary?days=30`).then((data) => {
+    void getJson<{ summary: AnalyticsSummary }>(`/api/app-metrics?days=30`).then((data) => {
       if (data?.summary) setSummary(data.summary);
     });
   }, []);
@@ -103,4 +103,3 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 function Empty({ text }: { text: string }) {
   return <p className="text-[12px] text-text-tertiary rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3">{text}</p>;
 }
-

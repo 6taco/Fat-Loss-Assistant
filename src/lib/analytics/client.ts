@@ -10,10 +10,11 @@ const LAST_ACTIVITY_KEY = 'fla_analytics_last_activity';
 const IDENTITY_KEY = 'fla_analytics_user_id';
 const BATCH_SIZE = 20;
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
-const ENDPOINT = '/api/analytics/events';
+const ENDPOINT = '/api/app-events';
 
 let flushTimer: number | null = null;
 let pageRoute = '/';
+let heartbeatStarted = false;
 
 export function initAnalytics(route: string) {
   pageRoute = route;
@@ -29,7 +30,10 @@ export function setAnalyticsRoute(route: string) {
 }
 
 export function identifyAnalyticsUser(userId: string | null | undefined) {
-  if (!userId) return;
+  if (!userId) {
+    setItem(IDENTITY_KEY, null);
+    return;
+  }
   setItem(IDENTITY_KEY, userId);
 }
 
@@ -174,10 +178,6 @@ function scheduleFlush() {
 
 async function sendBatch(batch: AnalyticsEventEnvelope[]) {
   const body = JSON.stringify({ events: batch });
-  if (navigator.sendBeacon) {
-    const ok = navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
-    if (ok) return true;
-  }
 
   const response = await fetch(ENDPOINT, {
     method: 'POST',
@@ -190,6 +190,9 @@ async function sendBatch(batch: AnalyticsEventEnvelope[]) {
 
 export function startHeartbeat() {
   if (typeof window === 'undefined') return;
+  if (heartbeatStarted) return;
+  heartbeatStarted = true;
+
   window.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flush();
   });

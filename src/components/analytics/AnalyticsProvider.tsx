@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { initAnalytics, setAnalyticsRoute } from '@/lib/analytics/client';
+import { getActiveAccount } from '@/lib/accounts';
+import { identifyAnalyticsUser, initAnalytics, recordPageView } from '@/lib/analytics/client';
 
 export default function AnalyticsProvider() {
   const pathname = usePathname();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    initAnalytics(pathname);
-  }, [pathname]);
+    identifyAnalyticsUser(getActiveAccount()?.id);
 
-  useEffect(() => {
-    setAnalyticsRoute(pathname);
+    if (!initialized.current) {
+      initAnalytics(pathname);
+      initialized.current = true;
+      return;
+    }
+
+    recordPageView(pathname);
   }, [pathname]);
 
   return null;
