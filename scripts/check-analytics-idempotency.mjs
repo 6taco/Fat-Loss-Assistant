@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+
+const source = fs.readFileSync('src/lib/analytics/collector.ts', 'utf8');
+
+if (!source.includes('function dedupeEventsById')) {
+  console.error('Analytics ingestion must dedupe repeated eventIds before database writes.');
+  process.exit(1);
+}
+
+if (!source.includes('skipDuplicates: true')) {
+  console.error('Analytics ingestion must tolerate eventId retries with skipDuplicates.');
+  process.exit(1);
+}
+
+console.log('Analytics ingestion is idempotent for repeated eventIds.');

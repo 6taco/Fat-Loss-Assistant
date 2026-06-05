@@ -6,7 +6,7 @@ export async function ingestAnalyticsEvents(events: AnalyticsEventEnvelope[]) {
   if (!events.length) return { inserted: 0 };
 
   const prisma = getPrisma();
-  const normalized = events.map(normalizeEvent);
+  const normalized = dedupeEventsById(events.map(normalizeEvent));
   const userIds = new Set<string>();
   const anonymousIds = new Set<string>();
   const dayBuckets = new Map<string, AnalyticsEventEnvelope[]>();
@@ -22,26 +22,27 @@ export async function ingestAnalyticsEvents(events: AnalyticsEventEnvelope[]) {
     sessionBuckets.get(event.sessionId)!.push(event);
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const event of normalized) {
-      await tx.analyticsEvent.create({
-        data: {
-          eventId: event.eventId,
-          eventName: event.eventName,
-          eventVersion: event.eventVersion,
-          userId: event.userId || null,
-          anonymousId: event.anonymousId,
-          sessionId: event.sessionId,
-          occurredAt: new Date(event.occurredAt),
-          clientTs: BigInt(event.clientTs),
-          route: event.route,
-          source: event.source,
-          pageRef: event.pageRef,
-          properties: event.properties as unknown as Prisma.InputJsonValue,
-          context: event.context as unknown as Prisma.InputJsonValue,
-        },
-      });
+  const inserted = await prisma.$transaction(async (tx) => {
+    const created = await tx.analyticsEvent.createMany({
+      data: normalized.map(event => ({
+        eventId: event.eventId,
+        eventName: event.eventName,
+        eventVersion: event.eventVersion,
+        userId: event.userId || null,
+        anonymousId: event.anonymousId,
+        sessionId: event.sessionId,
+        occurredAt: new Date(event.occurredAt),
+        clientTs: BigInt(event.clientTs),
+        route: event.route,
+        source: event.source,
+        pageRef: event.pageRef,
+        properties: event.properties as unknown as Prisma.InputJsonValue,
+        context: event.context as unknown as Prisma.InputJsonValue,
+      })),
+      skipDuplicates: true,
+    });
 
+    for (const event of normalized) {
       await upsertIdentity(tx, event);
       await upsertLifecycle(tx, event);
     }
@@ -53,9 +54,10 @@ export async function ingestAnalyticsEvents(events: AnalyticsEventEnvelope[]) {
     for (const [date, bucket] of dayBuckets.entries()) {
       await upsertDailyAggregates(tx, date, bucket);
     }
+    return created.count;
   });
 
-  return { inserted: normalized.length };
+  return { inserted, received: normalized.length };
 }
 
 function normalizeEvent(event: AnalyticsEventEnvelope): AnalyticsEventEnvelope {
@@ -73,6 +75,10 @@ function normalizeEvent(event: AnalyticsEventEnvelope): AnalyticsEventEnvelope {
     properties: event.properties || {},
     context: event.context || {},
   };
+}
+
+function dedupeEventsById(events: AnalyticsEventEnvelope[]) {
+  return Array.from(new Map(events.map(event => [event.eventId, event])).values());
 }
 
 async function upsertIdentity(
