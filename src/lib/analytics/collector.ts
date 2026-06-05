@@ -16,17 +16,6 @@ export async function ingestAnalyticsEvents(events: AnalyticsEventEnvelope[]) {
 
   if (!writable.length) return { inserted: 0, received: normalized.length };
 
-  const dayBuckets = new Map<string, AnalyticsEventEnvelope[]>();
-  const sessionBuckets = new Map<string, AnalyticsEventEnvelope[]>();
-
-  for (const event of writable) {
-    const day = event.occurredAt.slice(0, 10);
-    if (!dayBuckets.has(day)) dayBuckets.set(day, []);
-    dayBuckets.get(day)!.push(event);
-    if (!sessionBuckets.has(event.sessionId)) sessionBuckets.set(event.sessionId, []);
-    sessionBuckets.get(event.sessionId)!.push(event);
-  }
-
   const created = await prisma.analyticsEvent.createMany({
     data: writable.map(event => ({
       eventId: event.eventId,
@@ -45,19 +34,6 @@ export async function ingestAnalyticsEvents(events: AnalyticsEventEnvelope[]) {
     })),
     skipDuplicates: true,
   });
-
-  for (const event of writable) {
-    await upsertIdentity(prisma, event);
-    await upsertLifecycle(prisma, event);
-  }
-
-  for (const [sessionId, bucket] of sessionBuckets.entries()) {
-    await upsertSession(prisma, sessionId, bucket);
-  }
-
-  for (const [date, bucket] of dayBuckets.entries()) {
-    await upsertDailyAggregates(prisma, date, bucket);
-  }
 
   return { inserted: created.count, received: normalized.length };
 }
@@ -81,147 +57,6 @@ function normalizeEvent(event: AnalyticsEventEnvelope): AnalyticsEventEnvelope {
 
 function dedupeEventsById(events: AnalyticsEventEnvelope[]) {
   return Array.from(new Map(events.map(event => [event.eventId, event])).values());
-}
-
-async function upsertIdentity(
-  prisma: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
-  event: AnalyticsEventEnvelope,
-) {
-  const existing = await prisma.analyticsIdentity.findUnique({ where: { anonymousId: event.anonymousId } });
-  await prisma.analyticsIdentity.upsert({
-    where: { anonymousId: event.anonymousId },
-    create: {
-      anonymousId: event.anonymousId,
-      userId: event.userId || null,
-      firstUserAt: event.userId ? new Date(event.occurredAt) : null,
-      lastUserAt: event.userId ? new Date(event.occurredAt) : null,
-    },
-    update: {
-      userId: event.userId || existing?.userId || null,
-      lastUserAt: event.userId ? new Date(event.occurredAt) : existing?.lastUserAt || null,
-      firstUserAt: existing?.firstUserAt || (event.userId ? new Date(event.occurredAt) : null),
-    },
-  });
-}
-
-async function upsertSession(
-  prisma: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
-  sessionId: string,
-  events: AnalyticsEventEnvelope[],
-) {
-  const ordered = [...events].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
-  const startEvent = ordered.find(event => event.eventName === 'session_start') || ordered[0];
-  const endEvent = [...ordered].reverse().find(event => event.eventName === 'session_end') || ordered[ordered.length - 1];
-  const startedAt = new Date(startEvent.occurredAt);
-  const endedAt = new Date(endEvent.occurredAt);
-  const firstUserEvent = ordered.find(event => event.userId);
-
-  await prisma.analyticsSession.upsert({
-    where: { sessionId },
-    create: {
-      sessionId,
-      userId: firstUserEvent?.userId || null,
-      anonymousId: ordered[0].anonymousId,
-      startedAt,
-      endedAt,
-      durationMs: Math.max(0, endedAt.getTime() - startedAt.getTime()),
-      route: startEvent.route,
-      source: startEvent.source,
-    },
-    update: {
-      userId: firstUserEvent?.userId || null,
-      anonymousId: ordered[0].anonymousId,
-      startedAt,
-      endedAt,
-      durationMs: Math.max(0, endedAt.getTime() - startedAt.getTime()),
-      route: startEvent.route,
-      source: startEvent.source,
-    },
-  });
-}
-
-async function upsertDailyAggregates(
-  prisma: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
-  date: string,
-  events: AnalyticsEventEnvelope[],
-) {
-  const eventNames = new Set(events.map(event => event.eventName));
-  for (const eventName of eventNames) {
-    const bucket = events.filter(event => event.eventName === eventName);
-    const uniqueUsers = new Set(bucket.map(event => event.userId).filter(Boolean));
-    const uniqueAnonymous = new Set(bucket.map(event => event.anonymousId));
-    const existing = await prisma.analyticsDailyAggregate.findUnique({
-      where: {
-        date_eventName: {
-          date: new Date(`${date}T00:00:00`),
-          eventName,
-        },
-      },
-    });
-
-    await prisma.analyticsDailyAggregate.upsert({
-      where: {
-        date_eventName: {
-          date: new Date(`${date}T00:00:00`),
-          eventName,
-        },
-      },
-      create: {
-        date: new Date(`${date}T00:00:00`),
-        eventName,
-        eventCount: bucket.length,
-        userCount: uniqueUsers.size,
-        sessionCount: new Set(bucket.map(event => event.sessionId)).size,
-        uniqueAnonymous: uniqueAnonymous.size,
-        properties: {
-          routeCount: new Set(bucket.map(event => event.route)).size,
-        },
-      },
-      update: {
-        eventCount: (existing?.eventCount || 0) + bucket.length,
-        userCount: Math.max(existing?.userCount || 0, uniqueUsers.size),
-        sessionCount: Math.max(existing?.sessionCount || 0, new Set(bucket.map(event => event.sessionId)).size),
-        uniqueAnonymous: Math.max(existing?.uniqueAnonymous || 0, uniqueAnonymous.size),
-        properties: {
-          routeCount: new Set(bucket.map(event => event.route)).size,
-        },
-      },
-    });
-  }
-}
-
-async function upsertLifecycle(
-  prisma: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
-  event: AnalyticsEventEnvelope,
-) {
-  if (!event.userId) return;
-  const now = new Date(event.occurredAt);
-  const updates: Record<string, Date> = {};
-
-  if (event.eventName === 'sign_up') updates.registeredAt = now;
-  if (event.eventName === 'onboarding_complete') updates.onboardingCompletedAt = now;
-  if (event.eventName === 'plan_generate') updates.firstPlanGeneratedAt = now;
-  if (event.eventName === 'weight_log_create') updates.firstWeightLoggedAt = now;
-  if (event.eventName === 'meal_log_create') updates.firstMealLoggedAt = now;
-  if (event.eventName === 'photo_upload') updates.firstPhotoUploadedAt = now;
-  if (event.eventName === 'daily_report_view') updates.firstDailyReportViewAt = now;
-  if (event.eventName === 'weekly_report_view') updates.firstWeeklyReportViewAt = now;
-  if (event.eventName === 'ai_chat_send') updates.firstAiChatAt = now;
-  if (event.eventName === 'coach_feed_view') updates.firstCoachFeedViewAt = now;
-  if (event.eventName === 'proposal_accept') updates.firstProposalAcceptAt = now;
-
-  await prisma.analyticsUserLifecycle.upsert({
-    where: { userId: event.userId },
-    create: {
-      userId: event.userId,
-      anonymousId: event.anonymousId,
-      ...updates,
-    },
-    update: {
-      anonymousId: event.anonymousId,
-      ...updates,
-    },
-  });
 }
 
 export function isAnalyticsEventName(value: unknown): value is AnalyticsEventName {

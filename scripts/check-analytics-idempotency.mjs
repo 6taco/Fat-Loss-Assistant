@@ -17,4 +17,11 @@ if (source.includes('$transaction')) {
   process.exit(1);
 }
 
-console.log('Analytics ingestion is idempotent and avoids remote transaction timeouts.');
+for (const derivedWrite of ['upsertIdentity', 'upsertSession', 'upsertDailyAggregates', 'upsertLifecycle']) {
+  if (source.includes(derivedWrite)) {
+    console.error(`Analytics ingestion should not run derived write ${derivedWrite} in the request path.`);
+    process.exit(1);
+  }
+}
+
+console.log('Analytics ingestion writes raw events only, idempotently and quickly.');
