@@ -12,4 +12,9 @@ if (!source.includes('skipDuplicates: true')) {
   process.exit(1);
 }
 
-console.log('Analytics ingestion is idempotent for repeated eventIds.');
+if (source.includes('$transaction')) {
+  console.error('Analytics ingestion should not use an interactive transaction for remote event batches.');
+  process.exit(1);
+}
+
+console.log('Analytics ingestion is idempotent and avoids remote transaction timeouts.');
