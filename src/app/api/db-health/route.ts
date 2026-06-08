@@ -5,6 +5,8 @@ import * as mariadb from 'mariadb';
 import { buildMariaDbConfig } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 type StepResult = {
   ok: boolean;
@@ -14,6 +16,17 @@ type StepResult = {
 };
 
 export async function GET() {
+  try {
+    return await runHealthCheck();
+  } catch (error) {
+    return NextResponse.json({
+      ok: false,
+      error: getErrorMessage(error),
+    }, { status: 500 });
+  }
+}
+
+async function runHealthCheck() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     return NextResponse.json({ ok: false, error: 'DATABASE_URL is not configured.' }, { status: 500 });
@@ -55,7 +68,7 @@ async function measure<T>(fn: () => Promise<T>): Promise<StepResult> {
   const started = Date.now();
   try {
     const result = await fn();
-    return { ok: true, ms: Date.now() - started, result };
+    return { ok: true, ms: Date.now() - started, result: sanitize(result) };
   } catch (error) {
     return { ok: false, ms: Date.now() - started, error: getErrorMessage(error) };
   }
@@ -84,4 +97,10 @@ function testTcp(host: string, port: number, timeoutMs: number) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function sanitize(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value, (_key, item) => (
+    typeof item === 'bigint' ? item.toString() : item
+  )));
 }
