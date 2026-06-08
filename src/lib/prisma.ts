@@ -21,7 +21,7 @@ export function getPrisma() {
   return globalForPrisma.prisma;
 }
 
-function buildMariaDbConfig(databaseUrl: string): ConstructorParameters<typeof PrismaMariaDb>[0] {
+export function buildMariaDbConfig(databaseUrl: string): ConstructorParameters<typeof PrismaMariaDb>[0] {
   const url = new URL(databaseUrl);
   const sslMode = url.searchParams.get('ssl-mode') || url.searchParams.get('sslmode');
   const ca = process.env.DATABASE_CA_CERT || process.env.AIVEN_CA_CERT;
