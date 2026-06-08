@@ -48,9 +48,18 @@ async function runHealthCheck() {
       await connection.end();
     }
   });
+  const pool = await measure(async () => {
+    const connectionPool = mariadb.createPool(config as Parameters<typeof mariadb.createPool>[0]);
+    try {
+      const rows = await connectionPool.query('SELECT 1 AS ok');
+      return { rows };
+    } finally {
+      await connectionPool.end();
+    }
+  });
 
   return NextResponse.json({
-    ok: Boolean(dns.ok && tcp.ok && mysql.ok),
+    ok: Boolean(dns.ok && tcp.ok && mysql.ok && pool.ok),
     target: {
       host,
       port,
@@ -60,8 +69,8 @@ async function runHealthCheck() {
       hasCaCert: Boolean(process.env.DATABASE_CA_CERT || process.env.AIVEN_CA_CERT),
       connectionLimit: config && typeof config === 'object' && 'connectionLimit' in config ? config.connectionLimit : null,
     },
-    steps: { dns, tcp, mysql },
-  }, { status: dns.ok && tcp.ok && mysql.ok ? 200 : 500 });
+    steps: { dns, tcp, mysql, pool },
+  }, { status: dns.ok && tcp.ok && mysql.ok && pool.ok ? 200 : 500 });
 }
 
 async function measure<T>(fn: () => Promise<T>): Promise<StepResult> {
