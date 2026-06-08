@@ -11,6 +11,39 @@ const IDENTITY_KEY = 'fla_analytics_user_id';
 const BATCH_SIZE = 20;
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 const ENDPOINT = '/api/app-events';
+const VALID_EVENT_NAMES = new Set<AnalyticsEventName>([
+  'app_open',
+  'session_start',
+  'session_end',
+  'sign_up',
+  'onboarding_start',
+  'onboarding_complete',
+  'plan_generate',
+  'plan_complete',
+  'weight_log_create',
+  'meal_log_create',
+  'photo_upload',
+  'daily_report_view',
+  'weekly_report_view',
+  'ai_chat_send',
+  'ai_chat_reply',
+  'coach_feed_view',
+  'coach_feed_click',
+  'proposal_view',
+  'proposal_accept',
+  'proposal_dismiss',
+  'proposal_edit',
+  'proposal_expire',
+  'strategy_recommend_view',
+  'strategy_recommend_accept',
+  'strategy_recommend_dismiss',
+  'strategy_switch_proposed',
+  'strategy_switch_accept',
+  'strategy_day_goal_complete',
+  'fasting_window_complete',
+  'strategy_plateau_adjustment_proposed',
+  'binge_risk_detected',
+]);
 
 let flushTimer: number | null = null;
 let pageRoute = '/';
@@ -162,7 +195,17 @@ function getStoredUserId() {
 }
 
 function readQueue(): AnalyticsEventEnvelope[] {
-  return getItem<AnalyticsEventEnvelope[]>(STORAGE_KEY, []);
+  const rawQueue = getItem<unknown>(STORAGE_KEY, []);
+  if (!Array.isArray(rawQueue)) {
+    writeQueue([]);
+    return [];
+  }
+
+  const queue = rawQueue.filter(isSendableEvent);
+  if (queue.length !== rawQueue.length) {
+    writeQueue(queue);
+  }
+  return queue;
 }
 
 function writeQueue(queue: AnalyticsEventEnvelope[]) {
@@ -185,7 +228,29 @@ async function sendBatch(batch: AnalyticsEventEnvelope[]) {
     body,
     keepalive: true,
   });
+
+  if (!response.ok) {
+    console.warn('[analytics.flush] Event batch was not accepted', {
+      endpoint: ENDPOINT,
+      status: response.status,
+      eventCount: batch.length,
+    });
+  }
+
   return response.ok;
+}
+
+function isSendableEvent(value: unknown): value is AnalyticsEventEnvelope {
+  if (!value || typeof value !== 'object') return false;
+  const event = value as Partial<AnalyticsEventEnvelope>;
+  return Boolean(
+    event.eventId &&
+    event.eventName &&
+    VALID_EVENT_NAMES.has(event.eventName) &&
+    event.anonymousId &&
+    event.sessionId &&
+    event.occurredAt,
+  );
 }
 
 export function startHeartbeat() {

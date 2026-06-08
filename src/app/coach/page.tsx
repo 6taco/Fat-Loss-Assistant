@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Bell, Brain, Check, ChevronRight, Dumbbell, ListChecks, MessageSquare, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react';
@@ -34,6 +34,7 @@ const proposalIcon: Record<ActionProposal['type'], typeof Brain> = {
 export default function CoachPage() {
   const router = useRouter();
   const { feed, isLoading, error, loadFeed, runDaily, runWeekly, acceptProposal, dismissProposal } = useCoachStore();
+  const viewedProposalIds = useRef(new Set<string>());
 
   useEffect(() => {
     const activeAccount = getActiveAccount();
@@ -48,6 +49,21 @@ export default function CoachPage() {
     track('coach_feed_view', { feed_type: 'coach_page' }, { userId: activeAccount.id });
     loadFeed();
   }, [loadFeed, router]);
+
+  useEffect(() => {
+    const activeAccount = getActiveAccount();
+    if (!activeAccount) return;
+
+    for (const proposal of feed.proposals) {
+      if (viewedProposalIds.current.has(proposal.id)) continue;
+      viewedProposalIds.current.add(proposal.id);
+      track('proposal_view', {
+        proposal_id: proposal.id,
+        proposal_type: proposal.type,
+        origin: 'coach_feed',
+      }, { userId: activeAccount.id });
+    }
+  }, [feed.proposals]);
 
   const topInsight = feed.insights[0];
 

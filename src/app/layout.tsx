@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh-CN" className="h-full antialiased">
+    <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-dvh bg-bg-primary text-text-primary font-sans">
         <main className="max-w-[430px] mx-auto relative min-h-dvh">
           <DataInitProvider />

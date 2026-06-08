@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const typesSource = fs.readFileSync('src/lib/analytics/types.ts', 'utf8');
 const collectorSource = fs.readFileSync('src/lib/analytics/collector.ts', 'utf8');
+const clientSource = fs.readFileSync('src/lib/analytics/client.ts', 'utf8');
 
 const typeBlock = typesSource.match(/export type AnalyticsEventName =([\s\S]*?);/);
 if (!typeBlock) {
@@ -16,12 +17,20 @@ if (!validatorBlock) {
 }
 
 const accepted = [...validatorBlock[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+const clientBlock = clientSource.match(/const VALID_EVENT_NAMES = new Set<AnalyticsEventName>\(\[([\s\S]*?)\]\);/);
+if (!clientBlock) {
+  throw new Error('Unable to find client VALID_EVENT_NAMES list.');
+}
+
+const clientAccepted = [...clientBlock[1].matchAll(/'([^']+)'/g)].map(match => match[1]);
 const missing = declared.filter(eventName => !accepted.includes(eventName));
 const extra = accepted.filter(eventName => !declared.includes(eventName));
+const clientMissing = declared.filter(eventName => !clientAccepted.includes(eventName));
+const clientExtra = clientAccepted.filter(eventName => !declared.includes(eventName));
 
-if (missing.length || extra.length) {
-  console.error(JSON.stringify({ missing, extra }, null, 2));
+if (missing.length || extra.length || clientMissing.length || clientExtra.length) {
+  console.error(JSON.stringify({ missing, extra, clientMissing, clientExtra }, null, 2));
   process.exit(1);
 }
 
-console.log(`Analytics event validator covers ${declared.length} declared events.`);
+console.log(`Analytics event validator and client queue guard cover ${declared.length} declared events.`);

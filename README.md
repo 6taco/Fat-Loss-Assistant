@@ -167,3 +167,6 @@ npx prisma migrate deploy
 - 数据库可用时，用户资料、计划、体重、饮食会同步到 MySQL。
 - Coach 运行前会尝试把 localStorage 中的用户、计划、体重和饮食补写入数据库，避免空库时出现 `User not found`。
 - 手机端 PWA 如果访问 Netlify，数据是否跨设备同步取决于是否配置了线上云数据库。
+
+
+查看数据埋点：http://localhost:3000/analytics
