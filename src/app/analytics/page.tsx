@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
-import { getJson } from '@/lib/client-api';
 
 type AnalyticsSummary = {
   kpis: Record<string, number>;
@@ -13,17 +12,43 @@ type AnalyticsSummary = {
   platforms: Array<{ platform: string; count: number }>;
 };
 
+type AnalyticsResponse = {
+  summary: AnalyticsSummary | null;
+  warning?: string;
+};
+
 export default function AnalyticsPage() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [warning, setWarning] = useState('');
 
   useEffect(() => {
-    void getJson<{ summary: AnalyticsSummary }>(`/api/app-metrics?days=30`).then((data) => {
-      if (data?.summary) setSummary(data.summary);
-    });
+    void fetch('/api/app-metrics?days=30')
+      .then(async response => {
+        const data = await response.json().catch(() => null) as AnalyticsResponse | null;
+        if (!response.ok) {
+          setWarning(data?.warning || `Analytics API failed with status ${response.status}.`);
+          return;
+        }
+        if (data?.summary) {
+          setSummary(data.summary);
+          setWarning('');
+          return;
+        }
+        setWarning(data?.warning || 'Analytics summary is empty.');
+      })
+      .catch(error => {
+        setWarning(error instanceof Error ? error.message : 'Analytics API request failed.');
+      });
   }, []);
 
   return (
     <div className="px-5 pt-14 pb-28 min-h-dvh">
+      {warning && (
+        <GlassCard className="mb-5 border-red-200/70 bg-red-50/80 text-red-900">
+          <p className="text-[13px] font-semibold mb-2">数据接口异常</p>
+          <p className="text-[12px] leading-relaxed break-words">{warning}</p>
+        </GlassCard>
+      )}
       <div className="mb-6">
         <p className="text-[12px] text-text-tertiary mb-1">产品分析</p>
         <h1 className="text-[24px] font-semibold">AI Fat Loss Coach 数据看板</h1>
