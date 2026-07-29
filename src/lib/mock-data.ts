@@ -424,11 +424,19 @@ function getCycleRhythm(cycle: TrainingDay[]) {
   const rhythmDay = cycle.find(day => day.cycleMode === 'rhythm' && day.trainingStreak);
   if (!rhythmDay?.trainingStreak) return null;
 
+  const trainingStreak = Math.max(1, Math.min(6, rhythmDay.trainingStreak));
+  const cadenceLength = trainingStreak + 1;
+  const matchesGeneratedCadence = cycle.every((day, dayIndex) => {
+    const shouldRest = dayIndex % cadenceLength === trainingStreak;
+    return shouldRest ? day.muscleGroup === 'rest' : day.muscleGroup !== 'rest';
+  });
+  if (!matchesGeneratedCadence) return null;
+
   const rotation = cycle.filter(day => day.muscleGroup !== 'rest').map(day => day.muscleGroup);
   if (rotation.length === 0) return null;
 
   return {
-    trainingStreak: Math.max(1, Math.min(6, rhythmDay.trainingStreak)),
+    trainingStreak,
     rotation,
   };
 }

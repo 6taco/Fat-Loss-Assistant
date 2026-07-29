@@ -150,9 +150,11 @@ export default function OnboardingPage() {
   const updateTrainingDay = (dayIndex: number, muscleGroup: MuscleGroup) => {
     setForm(prev => ({
       ...prev,
-      trainingSchedule: prev.trainingSchedule.map(day =>
-        day.dayIndex === dayIndex ? { ...day, muscleGroup, label: muscleGroupLabels[muscleGroup] } : day,
-      ),
+      trainingSchedule: prev.trainingSchedule.map(day => ({
+        dayIndex: day.dayIndex,
+        muscleGroup: day.dayIndex === dayIndex ? muscleGroup : day.muscleGroup,
+        label: day.dayIndex === dayIndex ? muscleGroupLabels[muscleGroup] : day.label,
+      })),
     }));
   };
 
