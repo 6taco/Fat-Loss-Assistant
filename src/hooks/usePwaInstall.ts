@@ -2,9 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { BeforeInstallPromptEvent, isStandalonePwa } from '@/lib/pwa';
+import {
+  createDismissedInstallPromptState,
+  createInstalledInstallPromptState,
+  shouldShowInstallPrompt,
+  type InstallPromptState,
+} from '@/lib/pwa-install-state';
 
 const STORAGE_KEY = 'pwa_install_prompt';
-const DISMISS_DAYS = 3;
 
 // Capture the event as early as possible — before any React component mounts.
 // This runs once when the module is first imported (client-side only).
@@ -16,12 +21,7 @@ if (typeof window !== 'undefined') {
   }, { once: true });
 }
 
-interface StoredState {
-  dismissedAt?: number;
-  installed?: boolean;
-}
-
-function getStoredState(): StoredState {
+function getStoredState(): InstallPromptState {
   if (typeof window === 'undefined') return {};
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}');
@@ -30,20 +30,10 @@ function getStoredState(): StoredState {
   }
 }
 
-function setStoredState(state: StoredState) {
+function setStoredState(state: InstallPromptState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch { /* ignore */ }
-}
-
-function shouldShowPrompt(): boolean {
-  const state = getStoredState();
-  if (state.installed) return false;
-  if (state.dismissedAt) {
-    const daysSince = (Date.now() - state.dismissedAt) / (1000 * 60 * 60 * 24);
-    if (daysSince < DISMISS_DAYS) return false;
-  }
-  return true;
 }
 
 export function usePwaInstall() {
@@ -60,11 +50,15 @@ export function usePwaInstall() {
       setIsInstalled(true);
       return;
     }
-    if (!shouldShowPrompt()) return;
+    if (!shouldShowInstallPrompt(getStoredState())) return;
 
     const tryShow = (event: BeforeInstallPromptEvent) => {
       setPromptEvent(event);
-      setTimeout(() => setIsVisible(true), 2500);
+      setTimeout(() => {
+        if (shouldShowInstallPrompt(getStoredState())) {
+          setIsVisible(true);
+        }
+      }, 2500);
     };
 
     // Use cached event if already fired before this component mounted
@@ -85,7 +79,7 @@ export function usePwaInstall() {
       setIsInstalled(true);
       setIsVisible(false);
       setPromptEvent(null);
-      setStoredState({ installed: true });
+      setStoredState(createInstalledInstallPromptState());
     };
     window.addEventListener('appinstalled', onInstalled);
 
@@ -97,14 +91,17 @@ export function usePwaInstall() {
 
   const install = useCallback(async () => {
     if (!promptEvent) return false;
+    setIsVisible(false);
+    setStoredState(createInstalledInstallPromptState(false));
+
     await promptEvent.prompt();
     const { outcome } = await promptEvent.userChoice;
+    setPromptEvent(null);
+    cachedPromptEvent = null;
+
     if (outcome === 'accepted') {
       setIsInstalled(true);
-      setIsVisible(false);
-      setPromptEvent(null);
-      cachedPromptEvent = null;
-      setStoredState({ installed: true });
+      setStoredState(createInstalledInstallPromptState());
       return true;
     }
     return false;
@@ -112,12 +109,16 @@ export function usePwaInstall() {
 
   const dismiss = useCallback(() => {
     setIsVisible(false);
-    setStoredState({ dismissedAt: Date.now() });
+    setStoredState(createDismissedInstallPromptState());
   }, []);
 
   const triggerAfterAction = useCallback(() => {
-    if (promptEvent && shouldShowPrompt() && !isInstalled) {
-      setTimeout(() => setIsVisible(true), 800);
+    if (promptEvent && shouldShowInstallPrompt(getStoredState()) && !isInstalled) {
+      setTimeout(() => {
+        if (shouldShowInstallPrompt(getStoredState())) {
+          setIsVisible(true);
+        }
+      }, 800);
     }
   }, [promptEvent, isInstalled]);
 
