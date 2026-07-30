@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Flame, Gauge, Sparkles } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
-import { carbColors } from '@/lib/mock-data';
+import { carbColors, getPlanWeek } from '@/lib/mock-data';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useStrategyStore } from '@/stores/useStrategyStore';
 
@@ -18,7 +18,7 @@ export default function PlanPage() {
   }, [loadPlans, loadCurrent]);
 
   const strategyType = currentStrategy?.strategyType || recommendation?.strategyType || plans[0]?.strategyType || 'carb_cycling';
-  const weekPlans = plans.slice(0, 7);
+  const { plans: weekPlans, weekNumber, startIndex } = getPlanWeek(plans);
   const highDays = weekPlans.filter(plan => plan.carbType === 'high').length;
   const midDays = weekPlans.filter(plan => plan.carbType === 'mid').length;
   const lowDays = weekPlans.filter(plan => plan.carbType === 'low').length;
@@ -62,7 +62,7 @@ export default function PlanPage() {
                   <div className="w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1 text-[11px] font-semibold" style={{ background: color.bg, border: `2px solid ${color.main}`, color: color.main }}>
                     {color.emoji}
                   </div>
-                  <span className="text-[10px] text-text-tertiary">D{index + 1}</span>
+                  <span className="text-[10px] text-text-tertiary">D{startIndex + index + 1}</span>
                 </motion.div>
               );
             })}
@@ -78,7 +78,7 @@ export default function PlanPage() {
         </GlassCard>
       )}
 
-      <p className="text-[13px] text-text-secondary font-medium mb-3">每日目标</p>
+      <p className="text-[13px] text-text-secondary font-medium mb-3">第 {weekNumber} 周 · 每日目标</p>
       <div className="flex flex-col gap-2.5">
         {weekPlans.map((plan, index) => {
           const color = carbColors[plan.carbType];
@@ -90,8 +90,8 @@ export default function PlanPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-2 h-2 rounded-full shrink-0" style={{ background: accentColor, boxShadow: isCarbCycle ? `0 0 8px ${color.main}` : 'none' }} />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-semibold">第 {index + 1} 天 · {dayLabel(strategyType, plan.carbType)}</p>
-                    <p className="text-[12px] text-text-tertiary mt-0.5">{plan.trainingLabel || plan.date}</p>
+                    <p className="text-[15px] font-semibold">第 {weekNumber} 周 · 第 {index + 1} 天 · {dayLabel(strategyType, plan.carbType)}</p>
+                    <p className="text-[12px] text-text-tertiary mt-0.5">{plan.trainingLabel || '今日计划'} · {plan.date}</p>
                   </div>
                 </div>
                 <div className="text-right shrink-0">
