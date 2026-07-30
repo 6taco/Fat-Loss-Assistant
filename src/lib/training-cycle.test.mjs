@@ -2,10 +2,26 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  appendTrainingCycleDay,
   buildTrainingCycleByFrequency,
+  getPlanWeek,
   getTrainingDayForDateOffset,
   muscleGroupLabels,
+  removeLastTrainingCycleDay,
+  updateTrainingCycleDay,
 } from './mock-data.ts';
+
+function makePlan(date) {
+  return {
+    date,
+    carbType: 'mid',
+    calories: 1800,
+    carb: 200,
+    protein: 100,
+    fat: 60,
+    completed: false,
+  };
+}
 
 test('preserves manually configured rest days even when stale rhythm metadata remains', () => {
   const generatedCycle = buildTrainingCycleByFrequency(5);
@@ -41,5 +57,35 @@ test('keeps frequency-generated rhythm behavior when the generated cycle is unto
     'rest',
     'core',
     'chest',
+  ]);
+});
+
+test('supports adding, editing, and removing custom cycle days', () => {
+  const initialCycle = [
+    { dayIndex: 0, muscleGroup: 'chest', label: '练胸' },
+    { dayIndex: 1, muscleGroup: 'back', label: '练背' },
+  ];
+  const withRest = appendTrainingCycleDay(initialCycle);
+  const edited = updateTrainingCycleDay(withRest, 2, 'rest');
+  const shortened = removeLastTrainingCycleDay(edited);
+
+  assert.deepEqual(edited.map(day => day.muscleGroup), ['chest', 'back', 'rest']);
+  assert.deepEqual(shortened.map(day => day.muscleGroup), ['chest', 'back']);
+  assert.equal(shortened.every(day => !day.cycleMode && !day.trainingStreak), true);
+});
+
+test('selects the current calendar week instead of always using the first seven plans', () => {
+  const plans = Array.from({ length: 21 }, (_, index) => makePlan(`2026-07-${String(index + 1).padStart(2, '0')}`));
+  const currentWeek = getPlanWeek(plans, '2026-07-10');
+
+  assert.equal(currentWeek.weekNumber, 2);
+  assert.deepEqual(currentWeek.plans.map(plan => plan.date), [
+    '2026-07-08',
+    '2026-07-09',
+    '2026-07-10',
+    '2026-07-11',
+    '2026-07-12',
+    '2026-07-13',
+    '2026-07-14',
   ]);
 });

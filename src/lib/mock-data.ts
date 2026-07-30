@@ -420,6 +420,54 @@ export function normalizeTrainingCycle(cycle?: TrainingDay[]): TrainingDay[] {
   return hasTraining && hasRest ? normalized : defaultTrainingSchedule;
 }
 
+function toExplicitTrainingCycle(cycle: TrainingDay[]) {
+  return cycle.map((day, dayIndex) => ({
+    dayIndex,
+    muscleGroup: day.muscleGroup,
+    label: day.label || muscleGroupLabels[day.muscleGroup],
+  }));
+}
+
+export function appendTrainingCycleDay(cycle: TrainingDay[]): TrainingDay[] {
+  const explicitCycle = toExplicitTrainingCycle(cycle);
+  if (explicitCycle.length >= 14) return explicitCycle;
+  return [
+    ...explicitCycle,
+    {
+      dayIndex: explicitCycle.length,
+      muscleGroup: 'rest',
+      label: muscleGroupLabels.rest,
+    },
+  ];
+}
+
+export function removeLastTrainingCycleDay(cycle: TrainingDay[]): TrainingDay[] {
+  const explicitCycle = toExplicitTrainingCycle(cycle);
+  if (explicitCycle.length <= 2) return explicitCycle;
+  return explicitCycle.slice(0, -1);
+}
+
+export function updateTrainingCycleDay(cycle: TrainingDay[], dayIndex: number, muscleGroup: MuscleGroup): TrainingDay[] {
+  return toExplicitTrainingCycle(cycle).map(day => day.dayIndex === dayIndex
+    ? { ...day, muscleGroup, label: muscleGroupLabels[muscleGroup] }
+    : day);
+}
+
+export function getPlanWeek(plans: DayPlan[], currentDate = new Date().toISOString().slice(0, 10)) {
+  const sortedPlans = [...plans].sort((a, b) => a.date.localeCompare(b.date));
+  if (!sortedPlans.length) return { plans: [], weekNumber: 0, startIndex: 0 };
+
+  const currentIndex = sortedPlans.findIndex(plan => plan.date >= currentDate);
+  const anchorIndex = currentIndex === -1 ? sortedPlans.length - 1 : currentIndex;
+  const startIndex = Math.floor(anchorIndex / 7) * 7;
+
+  return {
+    plans: sortedPlans.slice(startIndex, startIndex + 7),
+    weekNumber: Math.floor(startIndex / 7) + 1,
+    startIndex,
+  };
+}
+
 function getCycleRhythm(cycle: TrainingDay[]) {
   const rhythmDay = cycle.find(day => day.cycleMode === 'rhythm' && day.trainingStreak);
   if (!rhythmDay?.trainingStreak) return null;

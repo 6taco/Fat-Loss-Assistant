@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Brain, ChevronLeft, Dumbbell, Moon, Scale, Target, Utensils } from 'lucide-react';
+import { Brain, ChevronLeft, Dumbbell, Moon, Plus, Scale, Target, Trash2, Utensils } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
@@ -11,9 +11,12 @@ import { getActiveAccount } from '@/lib/accounts';
 import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
 import {
   buildTrainingCycleByFrequency,
+  appendTrainingCycleDay,
   generateCarbCyclePlan,
   muscleGroupLabels,
   normalizeTrainingCycle,
+  removeLastTrainingCycleDay,
+  updateTrainingCycleDay,
   type MuscleGroup,
   type TrainingDay,
   type UserProfile,
@@ -148,14 +151,15 @@ export default function OnboardingPage() {
   };
 
   const updateTrainingDay = (dayIndex: number, muscleGroup: MuscleGroup) => {
-    setForm(prev => ({
-      ...prev,
-      trainingSchedule: prev.trainingSchedule.map(day => ({
-        dayIndex: day.dayIndex,
-        muscleGroup: day.dayIndex === dayIndex ? muscleGroup : day.muscleGroup,
-        label: day.dayIndex === dayIndex ? muscleGroupLabels[muscleGroup] : day.label,
-      })),
-    }));
+    setForm(prev => ({ ...prev, trainingSchedule: updateTrainingCycleDay(prev.trainingSchedule, dayIndex, muscleGroup) }));
+  };
+
+  const addTrainingDay = () => {
+    setForm(prev => ({ ...prev, trainingSchedule: appendTrainingCycleDay(prev.trainingSchedule) }));
+  };
+
+  const removeTrainingDay = () => {
+    setForm(prev => ({ ...prev, trainingSchedule: removeLastTrainingCycleDay(prev.trainingSchedule) }));
   };
 
   const next = async () => {
@@ -298,7 +302,33 @@ export default function OnboardingPage() {
               </div>
               {form.hasStrengthTraining && (
                 <div className="flex flex-col gap-3">
-                  {form.trainingSchedule.slice(0, 7).map(day => (
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-glass border border-border-glass px-3 py-2.5">
+                    <div>
+                      <p className="text-[13px] font-semibold">自定义训练周期 · {form.trainingSchedule.length} 天</p>
+                      <p className="text-[11px] text-text-tertiary mt-0.5">周期会跨自然周连续循环，不会每周重置。</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={removeTrainingDay}
+                        disabled={form.trainingSchedule.length <= 2}
+                        className="w-8 h-8 rounded-lg border border-border-glass bg-transparent text-text-secondary disabled:opacity-40"
+                        aria-label="删除最后一天"
+                      >
+                        <Trash2 size={14} className="mx-auto" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={addTrainingDay}
+                        disabled={form.trainingSchedule.length >= 14}
+                        className="w-8 h-8 rounded-lg gradient-accent text-white disabled:opacity-40"
+                        aria-label="增加一天"
+                      >
+                        <Plus size={14} className="mx-auto" />
+                      </button>
+                    </div>
+                  </div>
+                  {form.trainingSchedule.map(day => (
                     <GlassCard key={day.dayIndex} padding="p-3">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-[13px] font-semibold">训练日 {day.dayIndex + 1}</span>
