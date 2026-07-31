@@ -56,4 +56,5 @@ export const KEYS = {
   ONBOARDING: 'fla_onboarding',
   ACCOUNTS: 'fla_accounts',
   ACTIVE_ACCOUNT_ID: 'fla_active_account_id',
+  COACH_PREFERENCE: 'fla_coach_preference',
 } as const;

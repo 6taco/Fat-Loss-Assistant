@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Bell, Brain, Check, ChevronRight, Dumbbell, ListChecks, MessageSquare, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react';
@@ -11,6 +12,8 @@ import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import { useCoachStore } from '@/stores/useCoachStore';
+import { COACH_PROFILES, useCoachPreferenceStore } from '@/stores/useCoachPreferenceStore';
+import type { CoachGender } from '@/stores/useCoachPreferenceStore';
 import type { ActionProposal, CoachInsight } from '@/lib/mock-data';
 
 const insightTone: Record<CoachInsight['severity'], { label: string; className: string }> = {
@@ -34,7 +37,12 @@ const proposalIcon: Record<ActionProposal['type'], typeof Brain> = {
 export default function CoachPage() {
   const router = useRouter();
   const { feed, isLoading, error, loadFeed, runDaily, runWeekly, acceptProposal, dismissProposal } = useCoachStore();
+  const { gender: coachGender, loadPreference, setGender } = useCoachPreferenceStore();
   const viewedProposalIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    loadPreference();
+  }, [loadPreference]);
 
   useEffect(() => {
     const activeAccount = getActiveAccount();
@@ -86,6 +94,8 @@ export default function CoachPage() {
           <RefreshCw size={17} className={cn(isLoading && 'animate-spin')} />
         </button>
       </div>
+
+      <CoachSelector selected={coachGender} onSelect={setGender} />
 
       <GlassCard variant="highlight" className="mb-3 overflow-hidden relative">
         <div className="absolute right-[-56px] top-[-56px] w-36 h-36 rounded-full bg-accent-blue/10" />
@@ -183,6 +193,55 @@ export default function CoachPage() {
         {!feed.notifications.length && !feed.memories.length && <EmptyCard text="你采纳或忽略的建议会沉淀为长期记忆，让后续建议更贴合你。" />}
       </div>
     </div>
+  );
+}
+
+function CoachSelector({ selected, onSelect }: { selected: CoachGender; onSelect: (gender: CoachGender) => void }) {
+  return (
+    <GlassCard className="mb-4 p-3.5">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div>
+          <p className="text-[14px] font-semibold">选择你的 AI 教练</p>
+          <p className="text-[11px] text-text-tertiary mt-1">随时可以更换，聊天记录和计划不会受到影响</p>
+        </div>
+        <Sparkles size={17} className="text-accent-blue" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {(Object.keys(COACH_PROFILES) as CoachGender[]).map((gender) => {
+          const coach = COACH_PROFILES[gender];
+          const isSelected = selected === gender;
+
+          return (
+            <button
+              key={gender}
+              type="button"
+              onClick={() => onSelect(gender)}
+              className={cn(
+                'relative overflow-hidden rounded-2xl border p-2 text-left transition-all active:scale-[0.98]',
+                isSelected
+                  ? 'border-accent-blue/55 bg-accent-blue/10 shadow-[0_8px_20px_rgba(103,181,107,0.14)]'
+                  : 'border-border-glass bg-white/55 hover:bg-white/80',
+              )}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-white shadow-[0_4px_12px_rgba(104,83,55,0.14)]">
+                  <Image src={coach.avatar} alt={coach.displayName} fill sizes="48px" className="object-cover" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold">{coach.displayName}</p>
+                  <p className="mt-0.5 truncate text-[10px] text-text-tertiary">{coach.description}</p>
+                </div>
+              </div>
+              {isSelected && (
+                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-carb-low text-white">
+                  <Check size={12} />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </GlassCard>
   );
 }
 

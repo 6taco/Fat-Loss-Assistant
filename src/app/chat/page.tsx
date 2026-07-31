@@ -12,6 +12,8 @@ import { useDailyReportStore } from '@/stores/useDailyReportStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
+import { COACH_PROFILES, useCoachPreferenceStore } from '@/stores/useCoachPreferenceStore';
+import type { CoachProfile } from '@/stores/useCoachPreferenceStore';
 import { ChatCard, ChatMessage, DailyReport, getTodayPlan } from '@/lib/mock-data';
 
 const quickTags = ['今天吃什么？', '平台期怎么办？', '可以吃欺骗餐吗？', '帮我调整计划', '加餐建议'];
@@ -55,17 +57,20 @@ export default function ChatPage() {
   const { plans, loadPlans } = usePlanStore();
   const { entries: weightEntries, loadEntries } = useWeightStore();
   const { latestReport, isLoading: isReportLoading, error: reportError, loadReports, ensureLatestReport, generateReport } = useDailyReportStore();
+  const { gender: coachGender, loadPreference } = useCoachPreferenceStore();
+  const coach = COACH_PROFILES[coachGender];
   const [input, setInput] = useState('');
   const [openPanel, setOpenPanel] = useState<'coach' | 'report' | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    loadPreference();
     loadMessages();
     loadUser();
     loadPlans();
     loadEntries();
     loadReports();
-  }, [loadMessages, loadUser, loadPlans, loadEntries, loadReports]);
+  }, [loadPreference, loadMessages, loadUser, loadPlans, loadEntries, loadReports]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -106,6 +111,7 @@ export default function ChatPage() {
           history: currentMessages,
           context: {
             user,
+            coach: { gender: coach.gender, name: coach.name },
             todayPlan,
             recentWeights: weightEntries.slice(-5),
             completed: todayPlan?.completed,
@@ -173,21 +179,22 @@ export default function ChatPage() {
         isReportLoading={isReportLoading}
         reportError={reportError}
         onGenerateReport={handleGenerateReport}
+        coach={coach}
       />
 
-      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-5 pb-4">
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto px-5 pt-3 pb-4">
         <div className="flex flex-col gap-4">
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble key={msg.id} message={msg} coach={coach} />
             ))}
           </AnimatePresence>
 
           {isTyping && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2.5 items-start">
-              <Avatar />
-              <div className="rounded-[6px_18px_18px_18px] bg-white/[0.055] border border-white/10 px-4 py-3 shadow-[0_8px_28px_rgba(0,0,0,0.25)]">
-                <p className="text-[11px] text-text-tertiary mb-2">Coach Zero 正在认真听你说</p>
+              <Avatar coach={coach} />
+              <div className="rounded-[6px_18px_18px_18px] bg-white/82 border border-border-glass px-4 py-3 shadow-[0_8px_24px_rgba(104,83,55,0.10)]">
+                <p className="text-[11px] text-text-tertiary mb-2">{coach.displayName} 正在认真听你说</p>
                 <TypingDots />
               </div>
             </motion.div>
@@ -239,6 +246,7 @@ function TopFloatingPanels({
   isReportLoading,
   reportError,
   onGenerateReport,
+  coach,
 }: {
   openPanel: 'coach' | 'report' | null;
   onToggle: (panel: 'coach' | 'report') => void;
@@ -247,27 +255,31 @@ function TopFloatingPanels({
   isReportLoading: boolean;
   reportError: string;
   onGenerateReport: () => void;
+  coach: CoachProfile;
 }) {
   return (
-    <div className="absolute top-5 left-0 right-0 z-30 px-5 pointer-events-none">
-      <div className="flex justify-center gap-3">
+    <div className="absolute top-4 left-[74px] right-5 z-30 pointer-events-none">
+      <div className="flex items-center justify-between gap-2.5">
         <motion.button
           type="button"
           onClick={() => onToggle('coach')}
           whileTap={{ scale: 0.94 }}
-          className={`pointer-events-auto relative w-14 h-14 rounded-full border backdrop-blur-2xl flex items-center justify-center transition-colors ${
+          className={`pointer-events-auto relative min-w-0 flex-1 rounded-[20px] border px-2.5 py-2 backdrop-blur-xl flex items-center gap-2.5 text-left transition-colors ${
             openPanel === 'coach'
-              ? 'border-accent-blue/60 bg-accent-blue/10 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_28px_rgba(10,132,255,0.30)]'
-              : 'border-white/15 bg-bg-secondary/85 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_24px_rgba(10,132,255,0.18)]'
+              ? 'border-carb-low/45 bg-white shadow-[0_12px_30px_rgba(103,181,107,0.18)]'
+              : 'border-border-glass bg-white/88 shadow-[0_10px_26px_rgba(104,83,55,0.12)]'
           }`}
-          aria-label={openPanel === 'coach' ? '收起 Coach Zero' : '展开 Coach Zero'}
+          aria-label={openPanel === 'coach' ? `收起 ${coach.displayName}` : `展开 ${coach.displayName}`}
         >
-          <Avatar />
-          <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-carb-low border-2 border-bg-primary" />
+          <Avatar coach={coach} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] font-semibold text-text-primary">{coach.displayName}</span>
+            <span className="mt-0.5 block truncate text-[10px] text-text-tertiary">在线 · {coach.description}</span>
+          </span>
           <motion.span
             animate={{ rotate: openPanel === 'coach' ? 180 : 0 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-blue text-white flex items-center justify-center border border-white/20"
+            className="w-6 h-6 rounded-full bg-carb-low/12 text-carb-low flex items-center justify-center border border-carb-low/20"
           >
             <ChevronUp size={12} />
           </motion.span>
@@ -277,21 +289,21 @@ function TopFloatingPanels({
           type="button"
           onClick={() => onToggle('report')}
           whileTap={{ scale: 0.94 }}
-          className={`pointer-events-auto relative w-14 h-14 rounded-full border backdrop-blur-2xl flex items-center justify-center transition-colors ${
+          className={`pointer-events-auto relative w-12 h-12 shrink-0 rounded-[17px] border backdrop-blur-xl flex items-center justify-center transition-colors ${
             openPanel === 'report'
-              ? 'border-accent-blue/60 bg-accent-blue/10 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_28px_rgba(10,132,255,0.30)]'
-              : 'border-white/15 bg-bg-secondary/85 shadow-[0_12px_40px_rgba(0,0,0,0.38),0_0_24px_rgba(10,132,255,0.18)]'
+              ? 'border-carb-low/45 bg-white shadow-[0_12px_30px_rgba(103,181,107,0.18)]'
+              : 'border-border-glass bg-white/88 shadow-[0_10px_26px_rgba(104,83,55,0.12)]'
           }`}
           aria-label={openPanel === 'report' ? '收起 AI 减脂日报' : '展开 AI 减脂日报'}
         >
-          <CalendarCheck size={20} className="text-accent-blue" />
-          <span className="absolute -bottom-1 -right-1 min-w-6 h-6 rounded-full bg-bg-primary border border-accent-blue/50 px-1 flex items-center justify-center text-[10px] font-semibold text-white">
+          <CalendarCheck size={20} className="text-carb-low" />
+          <span className="absolute -bottom-1 -right-1 min-w-6 h-6 rounded-full bg-white border border-carb-low/50 px-1 flex items-center justify-center text-[10px] font-semibold text-text-primary">
             {isReportLoading && !report ? '--' : report?.score ?? 'AI'}
           </span>
           <motion.span
             animate={{ rotate: openPanel === 'report' ? 180 : 0 }}
             transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-accent-blue text-white flex items-center justify-center border border-white/20"
+            className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-carb-low text-white flex items-center justify-center border border-white/70"
           >
             <ChevronUp size={12} />
           </motion.span>
@@ -327,13 +339,14 @@ function TopFloatingPanels({
                 <X size={15} />
               </button>
               {openPanel === 'coach' ? (
-                <CoachHeader />
+                <CoachHeader coach={coach} />
               ) : (
                 <DailyReportPanel
                   report={report}
                   isLoading={isReportLoading}
                   error={reportError}
                   onGenerate={onGenerateReport}
+                  coach={coach}
                 />
               )}
             </motion.div>
@@ -344,13 +357,13 @@ function TopFloatingPanels({
   );
 }
 
-function CoachHeader() {
+function CoachHeader({ coach }: { coach: CoachProfile }) {
   return (
     <div className="glass-card-highlight p-4 flex items-center gap-3 pr-11">
-      <Avatar size="lg" />
+      <Avatar size="lg" coach={coach} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1">
-          <p className="text-[17px] font-semibold">Coach Zero</p>
+          <p className="text-[17px] font-semibold">{coach.displayName}</p>
           <span className="inline-flex items-center gap-1 rounded-full bg-carb-low/10 border border-carb-low/20 px-2 py-0.5 text-[10px] text-carb-low">
             <span className="w-1.5 h-1.5 rounded-full bg-carb-low" />
             在线
@@ -371,11 +384,13 @@ function DailyReportPanel({
   isLoading,
   error,
   onGenerate,
+  coach,
 }: {
   report: DailyReport | null;
   isLoading: boolean;
   error: string;
   onGenerate: () => void;
+  coach: CoachProfile;
 }) {
   const dateLabel = report ? formatReportDate(report.date) : '收盘复盘';
   const score = report?.score ?? 0;
@@ -406,7 +421,7 @@ function DailyReportPanel({
       </div>
 
       {isLoading && !report ? (
-        <p className="text-[13px] text-text-secondary leading-relaxed">Coach Zero 正在整理你的日报...</p>
+        <p className="text-[13px] text-text-secondary leading-relaxed">{coach.displayName} 正在整理你的日报...</p>
       ) : error && !report ? (
         <p className="text-[13px] text-text-secondary leading-relaxed">{error}</p>
       ) : report ? (
@@ -446,7 +461,7 @@ function formatReportDate(date: string) {
   return `${Number(month)}月${Number(day)}日 收盘复盘`;
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({ message, coach }: { message: ChatMessage; coach: CoachProfile }) {
   const isUser = message.role === 'user';
 
   return (
@@ -456,7 +471,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       transition={{ duration: 0.25 }}
       className={`flex ${isUser ? 'justify-end' : 'gap-2.5 items-start'}`}
     >
-      {!isUser && <Avatar />}
+      {!isUser && <Avatar coach={coach} />}
       <div
         className={`max-w-[82%] px-4 py-3 shadow-[0_8px_24px_rgba(104,83,55,0.10)] ${
           isUser
@@ -467,7 +482,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         {!isUser && (
           <div className="flex items-center gap-1.5 mb-1.5">
             <Sparkles size={12} className="text-carb-low" />
-            <span className="text-[11px] text-text-tertiary font-medium">Coach Zero</span>
+            <span className="text-[11px] text-text-tertiary font-medium">{coach.displayName}</span>
           </div>
         )}
         <p className={`text-[14px] leading-relaxed whitespace-pre-wrap break-words ${isUser ? 'text-white' : 'text-text-primary'}`}>
@@ -484,15 +499,15 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-function Avatar({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
+function Avatar({ size = 'sm', coach }: { size?: 'sm' | 'lg'; coach: CoachProfile }) {
   const dimensions = size === 'lg' ? 'w-14 h-14 rounded-full' : 'w-9 h-9 rounded-full';
   const imageSize = size === 'lg' ? 56 : 32;
 
   return (
     <div className={`${dimensions} relative overflow-hidden flex-shrink-0 bg-white border-2 border-white shadow-[0_6px_18px_rgba(79,148,96,0.22)]`}>
       <Image
-        src="/images/coach-zero-avatar.png"
-        alt="Coach Zero"
+        src={coach.avatar}
+        alt={coach.displayName}
         width={imageSize}
         height={imageSize}
         className="w-full h-full object-cover"

@@ -15,6 +15,7 @@ interface ChatRequestBody {
   history?: ChatMessage[];
   context?: {
     user?: { id?: string };
+    coach?: { gender?: 'male' | 'female'; name?: string };
     todayPlan?: unknown;
     recentWeights?: unknown[];
     completed?: boolean;
