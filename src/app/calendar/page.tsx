@@ -179,7 +179,7 @@ export default function CalendarPage() {
                 variant={selectedPlan.completed ? 'secondary' : 'primary'}
                 onClick={() => toggleComplete(selectedPlan.date)}
               >
-                {selectedPlan.completed ? '✓ 今日已完成' : '完成打卡'}
+                {selectedPlan.completed ? '✓ 今日已打卡' : '完成打卡'}
               </Button>
             </GlassCard>
           </motion.div>

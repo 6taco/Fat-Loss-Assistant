@@ -72,6 +72,7 @@ export default function DashboardPage() {
   const [showInbox, setShowInbox] = useState(false);
   const [selectedReport, setSelectedReport] = useState<{ type: 'daily'; report: DailyReport } | { type: 'weekly'; report: WeeklyReport } | null>(null);
   const [weightValue, setWeightValue] = useState('');
+  const [justCompleted, setJustCompleted] = useState(false);
 
   useEffect(() => {
     const activeAccount = getActiveAccount();
@@ -90,6 +91,12 @@ export default function DashboardPage() {
     loadReports();
     loadStrategy();
   }, [loadUser, loadPlans, loadEntries, loadMeals, loadReports, loadStrategy, router]);
+
+  useEffect(() => {
+    if (!justCompleted) return;
+    const timeoutId = window.setTimeout(() => setJustCompleted(false), 750);
+    return () => window.clearTimeout(timeoutId);
+  }, [justCompleted]);
 
   const profile = user || mockUser;
   const todayPlan = getTodayPlan(plans);
@@ -290,12 +297,16 @@ export default function DashboardPage() {
         <ActionCard icon={MessageSquare} label="问 AI" color="#F0B56E" onClick={() => router.push('/chat')} />
         <ActionCard
           icon={CheckCircle2}
-          label={todayPlan?.completed ? '已完成' : '今日完成'}
+          label={todayPlan?.completed ? '今日已打卡' : '今日完成'}
           color="#67B56B"
+          completed={todayPlan?.completed}
+          justCompleted={justCompleted}
           onClick={() => {
             if (!todayPlan) return;
+            const nextCompleted = !todayPlan.completed;
             toggleComplete(todayPlan.date);
-            showAppToast(todayPlan.completed ? '已取消今日完成。' : '今日完成状态已更新。', 'success');
+            setJustCompleted(nextCompleted);
+            showAppToast(nextCompleted ? '今日已打卡，完成状态已记录。' : '已取消今日打卡。', 'success');
           }}
         />
       </div>
@@ -601,11 +612,34 @@ function DailyReportDetail({ report, onBack }: { report: DailyReport; onBack: ()
   );
 }
 
-function ActionCard({ icon: Icon, label, color, onClick }: { icon: LucideIcon; label: string; color: string; onClick: () => void }) {
+function ActionCard({
+  icon: Icon,
+  label,
+  color,
+  completed = false,
+  justCompleted = false,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  color: string;
+  completed?: boolean;
+  justCompleted?: boolean;
+  onClick: () => void;
+}) {
   return (
-    <GlassCard padding="p-3" className="flex flex-col items-center gap-2 cursor-pointer active:scale-95 transition-transform" onClick={onClick}>
-      <Icon size={20} style={{ color }} />
-      <span className="text-[12px] text-text-secondary">{label}</span>
+    <GlassCard
+      padding="p-3"
+      className={`relative flex flex-col items-center gap-2 cursor-pointer transition-all duration-300 active:scale-95 ${
+        completed ? 'border-[#67B56B]/45 bg-[#67B56B]/[0.08] shadow-[0_10px_26px_rgba(103,181,107,0.16)]' : ''
+      } ${justCompleted ? 'scale-[1.03] ring-2 ring-[#67B56B]/25' : ''}`}
+      onClick={onClick}
+    >
+      {completed && <span className="absolute right-2 top-2 text-[9px] font-medium text-carb-low">已记录</span>}
+      <div className={`flex h-9 w-9 items-center justify-center rounded-full transition-transform duration-300 ${completed ? 'bg-[#67B56B]/15' : ''} ${justCompleted ? 'scale-110 rotate-[-8deg]' : ''}`}>
+        <Icon size={20} style={{ color }} />
+      </div>
+      <span className={`text-[12px] transition-colors ${completed ? 'text-carb-low font-medium' : 'text-text-secondary'}`}>{label}</span>
     </GlassCard>
   );
 }
