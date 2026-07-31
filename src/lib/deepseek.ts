@@ -45,8 +45,21 @@ export function toDeepSeekMessages(messages: ChatMessage[], latestContent: strin
     content: msg.content,
   }));
 
+  let coachInstruction = '';
+  if (context) {
+    try {
+      const parsedContext = JSON.parse(context) as { coach?: { name?: string } };
+      if (parsedContext.coach?.name) {
+        coachInstruction = `当前用户选择的 AI 教练是“教练${parsedContext.coach.name}”。请在回复中使用这个称呼，不要再使用 Coach Zero。`;
+      }
+    } catch {
+      coachInstruction = '';
+    }
+  }
+
   return [
     { role: 'system', content: COACH_ZERO_SYSTEM_PROMPT },
+    ...(coachInstruction ? [{ role: 'system' as const, content: coachInstruction }] : []),
     ...(context ? [{ role: 'system' as const, content: `当前用户上下文：\n${context}` }] : []),
     ...history,
     { role: 'user', content: latestContent },
