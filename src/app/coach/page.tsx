@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Bell, Brain, Check, ChevronRight, Dumbbell, ListChecks, MessageSquare, RefreshCw, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { Bell, Brain, Check, ChevronDown, ChevronRight, Dumbbell, ListChecks, MessageSquare, RefreshCw, ShoppingCart, Sparkles, X, type LucideIcon } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { track } from '@/lib/analytics/client';
@@ -163,21 +163,19 @@ export default function CoachPage() {
         )}
       </div>
 
-      <SectionTitle title="教练洞察" count={feed.insights.length} />
-      <div className="flex flex-col gap-3 mb-5">
+      <CoachAccordion id="coach-insights" title="教练洞察" count={feed.insights.length} icon={Sparkles}>
         {feed.insights.length ? feed.insights.map(insight => (
           <InsightCard key={insight.id} insight={insight} />
         )) : <EmptyCard text="运行一次每日复盘后，这里会出现第一条主动洞察。" />}
-      </div>
+      </CoachAccordion>
 
-      <SectionTitle title="记忆与提醒" count={feed.memories.length + feed.notifications.length} />
-      <div className="grid grid-cols-1 gap-3">
+      <CoachAccordion id="coach-memory" title="记忆与提醒" count={feed.memories.length + feed.notifications.length} icon={Bell}>
         {feed.notifications.slice(0, 3).map(notification => (
           <GlassCard key={notification.id} className="flex items-start gap-3">
-            <Bell size={16} className="text-accent-blue mt-0.5" />
+            <Bell size={16} className="mt-0.5 text-accent-blue" />
             <div>
               <p className="text-[13px] font-semibold">{notification.title}</p>
-              <p className="text-[12px] text-text-tertiary mt-1">{notification.body}</p>
+              <p className="mt-1 text-[12px] text-text-tertiary">{notification.body}</p>
             </div>
           </GlassCard>
         ))}
@@ -185,13 +183,13 @@ export default function CoachPage() {
           <GlassCard key={memory.id} className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[13px] font-semibold">{memory.title}</p>
-              <p className="text-[11px] text-text-tertiary mt-1">记忆类型：{memoryTypeLabel(memory.type)}</p>
+              <p className="mt-1 text-[11px] text-text-tertiary">记忆类型：{memoryTypeLabel(memory.type)}</p>
             </div>
-            <ChevronRight size={16} className="text-text-tertiary mt-0.5" />
+            <ChevronRight size={16} className="mt-0.5 text-text-tertiary" />
           </GlassCard>
         ))}
         {!feed.notifications.length && !feed.memories.length && <EmptyCard text="你采纳或忽略的建议会沉淀为长期记忆，让后续建议更贴合你。" />}
-      </div>
+      </CoachAccordion>
     </div>
   );
 }
@@ -251,6 +249,56 @@ function SectionTitle({ title, count }: { title: string; count: number }) {
       <p className="text-[13px] text-text-secondary font-medium">{title}</p>
       <span className="text-[11px] text-text-tertiary">{count}</span>
     </div>
+  );
+}
+
+function CoachAccordion({
+  id,
+  title,
+  count,
+  icon: Icon,
+  children,
+}: {
+  id: string;
+  title: string;
+  count: number;
+  icon: LucideIcon;
+  children: ReactNode;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <section className="mb-4">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={id}
+        onClick={() => setIsOpen(value => !value)}
+        className={cn(
+          'flex w-full items-center justify-between rounded-2xl border px-4 py-3.5 text-left transition-all active:scale-[0.99]',
+          isOpen ? 'border-accent-blue/25 bg-white/88 shadow-[0_8px_22px_rgba(104,83,55,0.07)]' : 'border-border-glass bg-white/72 hover:bg-white/88',
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', isOpen ? 'bg-accent-blue/12 text-accent-blue' : 'bg-[#F3F8ED] text-carb-low')}>
+            <Icon size={15} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[13px] font-semibold text-text-primary">{title}</span>
+            <span className="mt-0.5 block text-[10px] text-text-tertiary">{isOpen ? '点击收起详情' : '点击查看全部内容'}</span>
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 text-text-tertiary">
+          <span className="text-[11px]">{count}</span>
+          <ChevronDown size={16} className={cn('transition-transform duration-200', isOpen && 'rotate-180 text-accent-blue')} />
+        </span>
+      </button>
+      {isOpen && (
+        <motion.div id={id} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.22 }} className="mt-3 flex flex-col gap-3 overflow-hidden">
+          {children}
+        </motion.div>
+      )}
+    </section>
   );
 }
 

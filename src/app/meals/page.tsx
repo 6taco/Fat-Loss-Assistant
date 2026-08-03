@@ -283,19 +283,27 @@ export default function MealsPage() {
         )}
       </GlassCard>
 
-      <GlassCard className="mb-4">
-        <div className="flex items-center gap-2 mb-4">
-          <Plus size={16} className="text-accent-blue" />
-          <p className="text-[15px] font-semibold">记录一餐</p>
+      <GlassCard className="mb-4 overflow-hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#EAF6E8] text-[#4F9D58]">
+              <Plus size={17} strokeWidth={2.4} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15px] font-semibold">记录一餐</p>
+              <p className="mt-1 text-[11px] text-text-tertiary">选择餐次，快速补充今天的摄入</p>
+            </div>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#F3F8ED] px-2.5 py-1 text-[10px] font-medium text-carb-low">今日</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2 mb-4">
+        <div className="mt-4 grid grid-cols-4 gap-1 rounded-xl bg-[#FAFBF7] p-1">
           {mealTypes.map(type => (
             <button
               key={type}
               onClick={() => setMealType(type)}
-              className={`h-10 rounded-xl border text-[12px] font-medium transition-all ${
-                mealType === type ? 'gradient-accent text-white border-transparent' : 'bg-glass border-border-glass text-text-secondary'
+              className={`h-9 rounded-lg border text-[12px] font-medium transition-all ${
+                mealType === type ? 'gradient-accent border-transparent text-white shadow-[0_4px_12px_rgba(103,181,107,0.2)]' : 'border-transparent bg-transparent text-text-secondary hover:bg-white/70'
               }`}
             >
               {mealTypeLabels[type]}
@@ -312,19 +320,19 @@ export default function MealsPage() {
           className="hidden"
         />
 
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <Button variant="secondary" fullWidth onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
-            <Camera size={14} />
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <button type="button" onClick={() => photoInputRef.current?.click()} disabled={isWorking} className="flex h-[70px] flex-col items-center justify-center gap-2 rounded-xl border border-[#F0B56E]/25 bg-[#FFF7EB] text-[12px] font-medium text-[#C8873D] transition-all active:scale-[0.98] disabled:opacity-50">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F0B56E]/20"><Camera size={14} /></span>
             拍照
-          </Button>
-          <Button variant="secondary" fullWidth onClick={estimate} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
-            <Bot size={14} />
+          </button>
+          <button type="button" onClick={estimate} disabled={isWorking} className="flex h-[70px] flex-col items-center justify-center gap-2 rounded-xl border border-[#68B96C]/25 bg-[#F1FAEF] text-[12px] font-medium text-[#4F9D58] transition-all active:scale-[0.98] disabled:opacity-50">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#68B96C]/15"><Bot size={14} /></span>
             {isEstimating ? '估算中' : 'AI 估算'}
-          </Button>
-          <Button variant="secondary" fullWidth onClick={() => setEditMode(true)} disabled={isWorking} className="px-1.5 text-[12px] gap-1">
-            <Pencil size={14} />
+          </button>
+          <button type="button" onClick={() => setEditMode(true)} disabled={isWorking} className="flex h-[70px] flex-col items-center justify-center gap-2 rounded-xl border border-[#4F8FCB]/25 bg-[#F2F7FC] text-[12px] font-medium text-[#4F8FCB] transition-all active:scale-[0.98] disabled:opacity-50">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#4F8FCB]/12"><Pencil size={14} /></span>
             手动填写
-          </Button>
+          </button>
         </div>
 
         {photoPreviewUrl && (
@@ -361,12 +369,20 @@ export default function MealsPage() {
           </motion.div>
         )}
 
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="也可以直接输入：米饭半碗、鸡胸肉150g、青菜一份、奶茶半杯"
-          className="w-full min-h-[88px] rounded-xl bg-transparent border border-white/10 px-4 py-3 text-[14px] text-text-primary outline-none focus:border-accent-blue resize-none mb-3"
-        />
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <label htmlFor="meal-description" className="text-[12px] font-semibold text-text-secondary">这一餐吃了什么</label>
+            <span className="text-[10px] text-text-tertiary">支持自然描述</span>
+          </div>
+          <textarea
+            id="meal-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="例如：米饭半碗、鸡胸肉 150g、青菜一份"
+            className="min-h-[96px] w-full resize-none rounded-xl border border-border-glass bg-[#FAFBF7] px-4 py-3 text-[13px] leading-6 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent-blue/45 focus:bg-white"
+          />
+          <p className="mt-2 text-[10px] leading-relaxed text-text-tertiary">AI 会根据描述估算热量和营养素，保存前你可以随时调整结果。</p>
+        </div>
 
         {editMode && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
