@@ -14,11 +14,11 @@ import {
   Settings,
   Share2,
   Sparkles,
-  TrendingDown,
   Utensils,
   type LucideIcon,
 } from 'lucide-react';
 import InstallPrompt from '@/components/pwa/InstallPrompt';
+import WeightTrendCard from '@/components/dashboard/WeightTrendCard';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
 import { showAppToast } from '@/components/ui/ToastHost';
@@ -104,14 +104,8 @@ export default function DashboardPage() {
   const burnIndex = todayPlan ? getFatBurnIndex(todayPlan.carbType, todayPlan.completed) : 0;
   const mealSummary = getDailySummary(todayIso);
   const weights = useMemo(() => mergeInitialWeight(profile, weightEntries), [profile, weightEntries]);
-  const latestWeight = weights[weights.length - 1];
-  const prevWeight = weights.length >= 3 ? weights[weights.length - 3] : weights[0];
-  const weightDiff = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : 0;
   const chartEntries = weights.slice(-7);
-  const chartWeights = chartEntries.map(entry => entry.weight);
-  const minChartWeight = chartWeights.length ? Math.min(...chartWeights) : profile.weight - 1;
-  const maxChartWeight = chartWeights.length ? Math.max(...chartWeights) : profile.weight + 1;
-  const chartRange = Math.max(0.1, maxChartWeight - minChartWeight);
+  const latestWeight = chartEntries[chartEntries.length - 1];
   const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(profile.startDate).getTime()) / 86400000) + 1);
   const hasUnreadReports = dailyReports.some(report => !report.readAt) || weeklyReports.some(report => !report.readAt);
 
@@ -261,36 +255,7 @@ export default function DashboardPage() {
         </GlassCard>
       )}
 
-      <GlassCard className="mb-3 relative z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TrendingDown size={14} className="text-carb-low" />
-            <span className="text-[13px] font-medium">体重趋势</span>
-          </div>
-          <span className="text-[11px] text-text-tertiary">近 7 天</span>
-        </div>
-        <div className="flex items-end justify-between gap-1 h-12 mb-2">
-          {chartEntries.map((entry, index) => {
-            const height = ((entry.weight - minChartWeight) / chartRange) * 100;
-            return (
-              <div
-                key={`${entry.date}-${index}`}
-                className="flex-1 rounded-sm"
-                style={{
-                  height: `${Math.max(10, height)}%`,
-                  background: index === chartEntries.length - 1 ? '#68B96C' : 'rgba(96,74,48,0.08)',
-                }}
-              />
-            );
-          })}
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-[20px] font-bold">{latestWeight?.weight ?? profile.weight} kg</span>
-          <span className={`text-[12px] font-medium ${weightDiff <= 0 ? 'text-carb-low' : 'text-carb-high'}`}>
-            {weightDiff <= 0 ? '下降' : '上升'} {Math.abs(weightDiff).toFixed(1)} kg
-          </span>
-        </div>
-      </GlassCard>
+      <WeightTrendCard entries={chartEntries} fallbackWeight={profile.weight} />
 
       <div className="grid grid-cols-3 gap-3 relative z-10">
         <ActionCard icon={Scale} label="记体重" color="#68B96C" onClick={() => setShowWeightInput(true)} />

@@ -25,6 +25,11 @@ const timeRanges: { key: RangeKey; label: string; days: number | null }[] = [
 const chartHeight = 150;
 const plotTop = 14;
 const plotBottom = 106;
+const macroColors = {
+  carb: '#68B96C',
+  protein: '#4F8FCB',
+  fat: '#E6A15A',
+} as const;
 
 export default function TrendsPage() {
   const [range, setRange] = useState<RangeKey>('7');
@@ -79,7 +84,7 @@ export default function TrendsPage() {
   }));
   const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x},${point.y}`).join(' ');
   const areaPath = points.length ? `${linePath} L${points[points.length - 1].x},${plotBottom} L${points[0].x},${plotBottom} Z` : '';
-  const maxMacroTotal = Math.max(1, ...macroData.map(day => day.carb + day.protein + day.fat));
+  const maxMacroCalories = Math.max(1, ...macroData.map(day => day.calories));
   const averageMacros = getAverageMacros(macroData);
   const completedRate = plans.length ? Math.round((plans.filter(plan => plan.completed).length / plans.length) * 100) : 0;
   const streak = getCurrentStreak(plans);
@@ -176,28 +181,30 @@ export default function TrendsPage() {
           <span className="text-[11px] text-text-tertiary">{macroData.length} 天</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          <MacroStat label="平均热量" value={`${averageMacros.calories}`} unit="kcal" color="text-accent-blue" />
-          <MacroStat label="碳水" value={`${averageMacros.carb}`} unit="g" color="text-accent-blue" />
-          <MacroStat label="蛋白" value={`${averageMacros.protein}`} unit="g" color="text-carb-low" />
-          <MacroStat label="脂肪" value={`${averageMacros.fat}`} unit="g" color="text-carb-mid" />
+        <div className="mb-5 grid grid-cols-4 divide-x divide-[#604A30]/10">
+          <MacroStat label="平均热量" value={`${averageMacros.calories}`} unit="kcal" color="#2A261F" />
+          <MacroStat label="碳水" value={`${averageMacros.carb}`} unit="g" color={macroColors.carb} />
+          <MacroStat label="蛋白" value={`${averageMacros.protein}`} unit="g" color={macroColors.protein} />
+          <MacroStat label="脂肪" value={`${averageMacros.fat}`} unit="g" color={macroColors.fat} />
         </div>
 
         {macroData.length > 0 ? (
           <div className="overflow-x-auto pb-1">
-            <div className="flex items-end gap-2 h-36" style={{ minWidth: Math.max(350, macroData.length * 48) }}>
+            <div className="flex h-36 items-end gap-2 rounded-xl bg-[#FAFBF7] px-2 pt-3" style={{ minWidth: Math.max(280, macroData.length * 40) }}>
               {macroData.map((day, index) => {
-                const total = Math.max(1, day.carb + day.protein + day.fat);
-                const barHeight = Math.max(28, (total / maxMacroTotal) * 104);
+                const carbCalories = day.carb * 4;
+                const proteinCalories = day.protein * 4;
+                const fatCalories = day.fat * 9;
+                const barHeight = Math.max(42, (day.calories / maxMacroCalories) * 92);
                 return (
-                  <div key={day.date} className="flex-1 min-w-10 flex flex-col items-center">
-                    <div className="text-[10px] text-text-tertiary mb-1">{day.calories}</div>
-                    <div className="w-full flex flex-col justify-end gap-[1px]" style={{ height: barHeight }}>
-                      <motion.div className="w-full rounded-t-sm" style={{ background: '#0A84FF', height: `${(day.carb / total) * 100}%` }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03, duration: 0.35 }} />
-                      <motion.div className="w-full" style={{ background: '#30D158', height: `${(day.protein / total) * 100}%` }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03 + 0.08, duration: 0.35 }} />
-                      <motion.div className="w-full rounded-b-sm" style={{ background: '#FFD60A', height: `${(day.fat / total) * 100}%` }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03 + 0.16, duration: 0.35 }} />
+                  <div key={day.date} className="flex min-w-8 flex-1 flex-col items-center">
+                    <div className="mb-1 text-[9px] font-medium text-text-tertiary">{day.calories}</div>
+                    <div className="flex w-full flex-col justify-end gap-[2px] overflow-hidden rounded-md" style={{ height: barHeight }}>
+                      <motion.div className="w-full origin-bottom" style={{ background: macroColors.carb, flexGrow: carbCalories, flexBasis: 0 }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03, duration: 0.35 }} />
+                      <motion.div className="w-full origin-bottom" style={{ background: macroColors.protein, flexGrow: proteinCalories, flexBasis: 0 }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03 + 0.07, duration: 0.35 }} />
+                      <motion.div className="w-full origin-bottom" style={{ background: macroColors.fat, flexGrow: fatCalories, flexBasis: 0 }} initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ delay: index * 0.03 + 0.14, duration: 0.35 }} />
                     </div>
-                    <span className="text-[10px] text-text-tertiary mt-1">{formatDate(day.date)}</span>
+                    <span className="mt-1 text-[9px] text-text-tertiary">{formatDate(day.date)}</span>
                   </div>
                 );
               })}
@@ -207,10 +214,10 @@ export default function TrendsPage() {
           <p className="text-[13px] text-text-tertiary py-8 text-center">暂无饮食记录。保存餐食后这里会显示实际摄入趋势。</p>
         )}
 
-        <div className="grid grid-cols-3 gap-2 mt-4">
-          <MacroLegend color="bg-accent-blue" label="碳水" />
-          <MacroLegend color="bg-carb-low" label="蛋白" />
-          <MacroLegend color="bg-carb-mid" label="脂肪" />
+        <div className="mt-4 flex items-center justify-center gap-7">
+          <MacroLegend color={macroColors.carb} label="碳水" />
+          <MacroLegend color={macroColors.protein} label="蛋白" />
+          <MacroLegend color={macroColors.fat} label="脂肪" />
         </div>
       </GlassCard>
 
@@ -218,7 +225,7 @@ export default function TrendsPage() {
         <GlassCard padding="p-4" className="flex flex-col items-center">
           <Target size={14} className="text-accent-blue mb-2" />
           <p className="text-[11px] text-text-tertiary mb-2">执行率</p>
-          <RingChart size={80} centerValue={`${completedRate}%`} centerLabel="" rings={[{ value: completedRate, color: '#0A84FF', label: '', current: '', target: '' }]} />
+          <RingChart size={80} centerValue={`${completedRate}%`} centerLabel="" rings={[{ value: completedRate, color: '#68B96C', label: '', current: '', target: '' }]} />
         </GlassCard>
         <GlassCard padding="p-4" className="flex flex-col items-center justify-center">
           <Flame size={14} className="text-carb-high mb-2" />
@@ -235,9 +242,9 @@ export default function TrendsPage() {
 
 function MacroStat({ label, value, unit, color }: { label: string; value: string; unit: string; color: string }) {
   return (
-    <div className="rounded-lg bg-glass px-2 py-2 text-center">
+    <div className="px-1 text-center">
       <p className="text-[10px] text-text-tertiary mb-1">{label}</p>
-      <p className={`text-[15px] font-semibold ${color}`}>{value}</p>
+      <p className="text-[16px] font-semibold" style={{ color }}>{value}</p>
       <p className="text-[9px] text-text-tertiary">{unit}</p>
     </div>
   );
@@ -245,8 +252,8 @@ function MacroStat({ label, value, unit, color }: { label: string; value: string
 
 function MacroLegend({ color, label }: { color: string; label: string }) {
   return (
-    <div className="flex items-center justify-center gap-1 rounded-lg bg-glass px-2 py-2">
-      <div className={`w-2 h-2 rounded-sm ${color}`} />
+    <div className="flex items-center justify-center gap-1.5">
+      <div className="h-2 w-2 rounded-full" style={{ background: color }} />
       <span className="text-[10px] text-text-tertiary">{label}</span>
     </div>
   );
