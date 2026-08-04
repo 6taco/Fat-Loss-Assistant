@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { askDeepSeek } from '@/lib/deepseek';
 import { getPrisma } from '@/lib/prisma';
 import { dateToISODate, toDate } from '@/lib/server-mappers';
+import { getCurrentUserWeekIndex, getPreviousClosedWeekIndex } from './weekly-report-schedule.mjs';
 import {
   calculateMealCalories,
   type WeeklyReport,
@@ -54,16 +55,7 @@ export function getWeekRangeByIndex(userStartDate: string, weekIndex: number) {
   };
 }
 
-export function getCurrentUserWeekIndex(userStartDate: string, now = new Date()): number {
-  const start = toDate(userStartDate).getTime();
-  const diff = Math.floor((toDate(dateToISODate(now)).getTime() - start) / 86400000);
-  return Math.max(1, Math.floor(diff / 7) + 1);
-}
-
-export function getPreviousClosedWeekIndex(userStartDate: string, now = new Date()): number | null {
-  const current = getCurrentUserWeekIndex(userStartDate, now);
-  return current > 1 ? current - 1 : null;
-}
+export { getCurrentUserWeekIndex, getPreviousClosedWeekIndex };
 
 export async function collectWeeklyReportMetrics(userId: string, weekIndex?: number): Promise<WeeklyMetricsContext> {
   const prisma = getPrisma();
