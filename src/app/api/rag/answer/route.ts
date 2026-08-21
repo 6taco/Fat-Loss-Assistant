@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { answerWithRag } from '@/lib/rag/answer';
+import { optionalAuth } from '@/lib/auth-server';
 
 interface AnswerBody {
   userId?: string;
@@ -11,9 +12,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json() as AnswerBody;
   const question = body.question?.trim();
   if (!question) return NextResponse.json({ error: 'question is required' }, { status: 400 });
+  const auth = await optionalAuth(request);
 
   try {
-    const result = await answerWithRag({ userId: body.userId, question, context: body.context });
+    const result = await answerWithRag({ userId: auth?.userId || undefined, question, context: body.context });
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({

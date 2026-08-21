@@ -3,7 +3,7 @@ import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import { syncLocalDataToServer } from '@/lib/client-sync';
 import type { ActionProposal, CoachFeed } from '@/lib/mock-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 
 interface CoachState {
@@ -25,9 +25,7 @@ const emptyFeed: CoachFeed = {
 };
 
 function getLocalUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<{ id?: string } | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<{ id?: string } | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 function getCoachFeedKey() {
@@ -153,7 +151,7 @@ function normalizeFeed(feed: Partial<CoachFeed> | null | undefined): CoachFeed {
   };
 }
 
-function normalizeProposal(proposal: any): ActionProposal {
+function normalizeProposal(proposal: ActionProposal): ActionProposal {
   return {
     ...proposal,
     toolName: proposal.toolName,

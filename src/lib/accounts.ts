@@ -80,7 +80,25 @@ export function createAccount(name: string): Account {
   return account;
 }
 
+export function createCloudAccount(id: string, email: string): Account {
+  const accounts = getAccounts();
+  const existing = accounts.find(account => account.id === id);
+  const now = new Date().toISOString();
+  const account: Account = existing
+    ? { ...existing, name: existing.name || email, lastActiveAt: now }
+    : { id, name: email, createdAt: now, lastActiveAt: now };
+  setItem(KEYS.ACCOUNTS, existing
+    ? accounts.map(item => item.id === id ? account : item)
+    : [...accounts, account]);
+  setItem(KEYS.ACTIVE_ACCOUNT_ID, id);
+  return account;
+}
+
 export function getScopedKey(baseKey: string): string {
   const activeId = getActiveAccountId();
-  return `fla:${activeId || 'no-active-account'}:${baseKey}`;
+  return getAccountScopedKey(activeId, baseKey);
+}
+
+export function getAccountScopedKey(accountId: string | null, baseKey: string): string {
+  return `fla:${accountId || 'no-active-account'}:${baseKey}`;
 }

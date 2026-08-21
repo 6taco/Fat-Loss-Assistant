@@ -1,6 +1,6 @@
 import { KEYS, getItem, removeItem } from '@/lib/storage';
 import { ChatMessage, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getAccounts, getAccountScopedKey, getActiveAccount, getScopedKey } from '@/lib/accounts';
 
 export interface LocalAppData {
   exportedAt: string;
@@ -10,17 +10,29 @@ export interface LocalAppData {
   weightEntries: WeightEntry[];
   mealLogs: MealLog[];
   chatMessages: ChatMessage[];
+  dailyReports?: unknown[];
+  weeklyReports?: unknown[];
+  lifestyleProfile?: unknown;
 }
 
 export function readLocalAppData(): LocalAppData {
+  return readLocalAppDataForAccount(getActiveAccount()?.id || null);
+}
+
+export function readLocalAppDataForAccount(accountId: string | null): LocalAppData {
+  const account = getAccounts().find(item => item.id === accountId) || null;
+  const key = (baseKey: string) => getAccountScopedKey(accountId, baseKey);
   return {
     exportedAt: new Date().toISOString(),
-    account: getActiveAccount(),
-    user: getItem<UserProfile | null>(getScopedKey(KEYS.USER), null),
-    plans: getItem<DayPlan[]>(getScopedKey(KEYS.PLAN), []),
-    weightEntries: getItem<WeightEntry[]>(getScopedKey(KEYS.WEIGHT), []),
-    mealLogs: getItem<MealLog[]>(getScopedKey(KEYS.MEALS), []),
-    chatMessages: getItem<ChatMessage[]>(getScopedKey(KEYS.CHAT), []),
+    account,
+    user: getItem<UserProfile | null>(key(KEYS.USER), null),
+    plans: getItem<DayPlan[]>(key(KEYS.PLAN), []),
+    weightEntries: getItem<WeightEntry[]>(key(KEYS.WEIGHT), []),
+    mealLogs: getItem<MealLog[]>(key(KEYS.MEALS), []),
+    chatMessages: getItem<ChatMessage[]>(key(KEYS.CHAT), []),
+    dailyReports: getItem<unknown[]>(key(KEYS.DAILY_REPORTS), []),
+    weeklyReports: getItem<unknown[]>(key(KEYS.WEEKLY_REPORTS), []),
+    lifestyleProfile: getItem<unknown | null>(key(KEYS.LIFESTYLE_PROFILE), null) || undefined,
   };
 }
 

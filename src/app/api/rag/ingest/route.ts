@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestKnowledgeSource } from '@/lib/rag/ingest';
 import type { RagSourceInput } from '@/lib/rag/types';
+import { requireAdmin } from '@/lib/auth-server';
 
 export async function POST(request: NextRequest) {
+  const authResponse = requireAdmin(request);
+  if (authResponse) return authResponse;
   const body = await request.json() as Partial<RagSourceInput>;
   if (!body.title || !body.authority || !body.sourceType || !body.content) {
     return NextResponse.json({ error: 'title, authority, sourceType and content are required' }, { status: 400 });

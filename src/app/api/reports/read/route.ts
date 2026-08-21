@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface ReadBody {
   userId?: string;
@@ -9,29 +10,36 @@ interface ReadBody {
 
 export async function PATCH(request: NextRequest) {
   const body = (await request.json()) as ReadBody;
-  if (!body.userId || !body.type || !body.id) {
-    return NextResponse.json({ error: 'userId, type and id are required' }, { status: 400 });
+  if (!body.type || !body.id) {
+    return NextResponse.json({ error: 'type and id are required' }, { status: 400 });
   }
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
     const readAt = new Date();
 
     if (body.type === 'daily') {
+      const report = await prisma.dailyReport.findFirst({ where: { id: body.id, userId } });
+      if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 });
       await prisma.dailyReport.update({
-        where: { id: body.id, userId: body.userId },
+        where: { id: report.id },
         data: { readAt },
       });
     } else {
+      const report = await prisma.weeklyReport.findFirst({ where: { id: body.id, userId } });
+      if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 });
       await prisma.weeklyReport.update({
-        where: { id: body.id, userId: body.userId },
+        where: { id: report.id },
         data: { readAt },
       });
     }
 
     return NextResponse.json({ id: body.id, type: body.type, readAt: readAt.toISOString(), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ id: body.id, type: body.type, readAt: new Date().toISOString(), source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 

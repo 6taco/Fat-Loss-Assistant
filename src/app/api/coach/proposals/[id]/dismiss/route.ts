@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { dismissToolProposal } from '@/lib/mcp/executor';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface ProposalDecisionBody {
   userId?: string;
@@ -7,10 +8,11 @@ interface ProposalDecisionBody {
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const [{ id }, body] = await Promise.all([params, request.json() as Promise<ProposalDecisionBody>]);
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
 
   try {
-    const proposal = await dismissToolProposal(id, body.userId);
+    const proposal = await dismissToolProposal(id, auth.context.userId!);
     return NextResponse.json({ proposal, source: 'db' });
   } catch (error) {
     return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });

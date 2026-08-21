@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { getJson } from '@/lib/client-api';
 import { buildWeightPrediction } from '@/lib/weight-prediction-core';
 import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/mock-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 
 interface WeightPredictionState {
@@ -15,9 +15,7 @@ interface WeightPredictionState {
 }
 
 function getLocalUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 function sortPredictions(predictions: WeightPredictionResult[]) {

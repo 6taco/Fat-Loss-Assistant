@@ -3,15 +3,11 @@ import { generateDailyReport, getReportDateForCron } from '@/lib/daily-report';
 import { getPrisma } from '@/lib/prisma';
 import { upsertSentReportNotification } from '@/lib/report-notification-store';
 import { buildDailyReportNotification } from '@/lib/report-notifications';
+import { requireCron } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get('authorization');
-  const querySecret = request.nextUrl.searchParams.get('secret');
-
-  if (secret && auth !== `Bearer ${secret}` && querySecret !== secret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authResponse = requireCron(request);
+  if (authResponse) return authResponse;
 
   const date = request.nextUrl.searchParams.get('date') || getReportDateForCron();
   const prisma = getPrisma();

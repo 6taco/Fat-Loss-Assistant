@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS } from '@/lib/storage';
 import type { StrategyCurrentResponse } from '@/lib/strategy-engine/types';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 const tabs = [
   { id: 'dashboard', label: '首页', icon: Home, path: '/dashboard' },
@@ -21,6 +22,7 @@ const tabs = [
 
 export default function TabBar() {
   const pathname = usePathname();
+  const auth = useAuth();
   const [strategy, setStrategy] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function TabBar() {
     };
   }, []);
 
-  if (pathname === '/' || pathname.startsWith('/onboarding') || pathname.startsWith('/accounts')) return null;
+  if (auth.status !== 'authenticated' || pathname === '/' || pathname.startsWith('/onboarding') || pathname.startsWith('/accounts') || pathname.startsWith('/auth/')) return null;
 
   const visibleTabs = strategy && strategy !== 'carb_cycling'
     ? tabs.filter(tab => tab.id !== 'calendar')

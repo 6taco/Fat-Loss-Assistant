@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnalyticsDashboard } from '@/lib/analytics/queries';
+import { requireAdmin } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
+  const authResponse = requireAdmin(request);
+  if (authResponse) return authResponse;
   const days = Number(request.nextUrl.searchParams.get('days') || 30);
 
   try {

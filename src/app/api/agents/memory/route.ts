@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
@@ -21,15 +23,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  if (!body.userId || !body.agent || !body.type || !body.title) {
-    return NextResponse.json({ error: 'userId, agent, type and title are required' }, { status: 400 });
+  if (!body.agent || !body.type || !body.title) {
+    return NextResponse.json({ error: 'agent, type and title are required' }, { status: 400 });
   }
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
     const memory = await prisma.agentMemory.create({
       data: {
-        userId: body.userId,
+        userId,
         agent: body.agent,
         type: body.type,
         title: body.title,

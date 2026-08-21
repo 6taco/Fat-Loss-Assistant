@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { toDate, weightToResponse } from '@/lib/server-mappers';
-import { WeightEntry, mockWeightLog } from '@/lib/mock-data';
+import { WeightEntry } from '@/lib/mock-data';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface WeightBody extends WeightEntry {
   userId?: string;
 }
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
@@ -20,14 +22,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ entries: entries.map(weightToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ entries: [], source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error), entries: [] }, { status: 503 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as WeightBody;
-  if (!body.userId || !body.date || !body.weight) {
-    return NextResponse.json({ error: 'userId, date and weight are required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
+  if (!body.date || !body.weight) {
+    return NextResponse.json({ error: 'date and weight are required' }, { status: 400 });
   }
 
   try {
@@ -36,12 +41,12 @@ export async function POST(request: NextRequest) {
     const entry = await prisma.weightEntry.upsert({
       where: {
         userId_date: {
-          userId: body.userId,
+          userId,
           date: toDate(body.date),
         },
       },
       create: {
-        userId: body.userId,
+        userId,
         date: toDate(body.date),
         weight: body.weight,
       },
@@ -52,11 +57,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ entry: weightToResponse(entry), source: 'db' });
   } catch (error) {
-    return NextResponse.json({
-      entry: mockWeightLog.find(entry => entry.date === body.date) || { date: body.date, weight: body.weight },
-      source: 'local',
-      warning: getErrorMessage(error),
-    });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 

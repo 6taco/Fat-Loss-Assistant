@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { dayPlanToResponse } from '@/lib/server-mappers';
-import { mockPlan } from '@/lib/mock-data';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-
-  if (!userId) {
-    return NextResponse.json({ plans: mockPlan, source: 'mock' });
-  }
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
@@ -19,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ plans: plans.map(dayPlanToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), plans: mockPlan, source: 'fallback' }, { status: 503 });
+    return NextResponse.json({ error: getErrorMessage(error), plans: [], source: 'db' }, { status: 503 });
   }
 }
 

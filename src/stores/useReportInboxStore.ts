@@ -11,7 +11,7 @@ import {
   WeeklyReport,
   WeeklyReportRisk,
 } from '@/lib/mock-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 
 interface ReportInboxState {
@@ -25,9 +25,7 @@ interface ReportInboxState {
 }
 
 function getLocalUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 function sortDaily(reports: DailyReport[]) {

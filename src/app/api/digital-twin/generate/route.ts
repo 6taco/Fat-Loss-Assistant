@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDigitalTwin } from '@/lib/digital-twin/service';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface GenerateBody {
   userId?: string;
@@ -9,10 +10,12 @@ interface GenerateBody {
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as GenerateBody;
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
-    const twin = await generateDigitalTwin(body.userId, {
+    const twin = await generateDigitalTwin(userId, {
       horizonDays: body.horizonDays || 30,
       force: Boolean(body.force),
     });

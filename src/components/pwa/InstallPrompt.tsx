@@ -7,11 +7,10 @@ import { showAppToast } from '@/components/ui/ToastHost';
 
 export default function InstallPrompt() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => isStandalonePwa());
   const [statusText, setStatusText] = useState('检测安装环境中');
 
   useEffect(() => {
-    setIsInstalled(isStandalonePwa());
     void getPwaStatus().then((status) => {
       if (status.standalone) setStatusText('已从主屏幕独立窗口打开');
       else if (status.serviceWorker && status.manifest) setStatusText('已具备安装条件');

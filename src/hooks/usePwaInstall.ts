@@ -39,17 +39,10 @@ function setStoredState(state: InstallPromptState) {
 export function usePwaInstall() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(() => isStandalonePwa() || Boolean(getStoredState().installed));
 
   useEffect(() => {
-    if (isStandalonePwa()) {
-      setIsInstalled(true);
-      return;
-    }
-    if (getStoredState().installed) {
-      setIsInstalled(true);
-      return;
-    }
+    if (isStandalonePwa() || getStoredState().installed) return;
     if (!shouldShowInstallPrompt(getStoredState())) return;
 
     const tryShow = (event: BeforeInstallPromptEvent) => {

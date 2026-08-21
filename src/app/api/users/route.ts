@@ -2,28 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import { toDate, userToResponse } from '@/lib/server-mappers';
-import { mockUser, UserProfile } from '@/lib/mock-data';
+import { UserProfile } from '@/lib/mock-data';
+import { requireAuth, requireBusinessUser } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const id = request.nextUrl.searchParams.get('id');
-
-  if (!id) {
-    return NextResponse.json({ user: mockUser, source: 'mock' });
-  }
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('id'));
+  if (auth.response) return auth.response;
+  const id = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
     const user = await prisma.user.findUnique({ where: { id } });
-    if (!user) return NextResponse.json({ user: null, source: 'local' });
+    if (!user) return NextResponse.json({ error: 'PROFILE_NOT_FOUND' }, { status: 404 });
 
     return NextResponse.json({ user: userToResponse(user), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ user: null, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const user = (await request.json()) as Partial<UserProfile>;
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
   const trainingSchedule = user.trainingSchedule as Prisma.InputJsonValue | undefined;
 
   if (!user.gender || !user.age || !user.height || !user.weight || !user.bodyFat) {
@@ -34,9 +35,9 @@ export async function POST(request: NextRequest) {
     const prisma = getPrisma();
 
     const saved = await prisma.user.upsert({
-      where: { id: user.id || `user-${Date.now()}` },
+      where: { authUserId: auth.context.authUserId },
       create: {
-        id: user.id || `user-${Date.now()}`,
+        authUserId: auth.context.authUserId,
         name: user.name || 'Alex',
         gender: user.gender,
         age: user.age,
@@ -70,24 +71,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ user: userToResponse(saved), source: 'db' });
   } catch (error) {
-    const localUser: UserProfile = {
-      id: user.id || `user-${Date.now()}`,
-      name: user.name || 'Alex',
-      gender: user.gender,
-      age: user.age,
-      height: user.height,
-      weight: user.weight,
-      bodyFat: user.bodyFat,
-      trainingFrequency: user.trainingFrequency || 4,
-      trainingIntensity: user.trainingIntensity || 'medium',
-      startDate: user.startDate || new Date().toISOString().slice(0, 10),
-      initialWeightDate: user.initialWeightDate,
-      goalWeight: user.goalWeight || Math.round(user.weight * 0.9),
-      somatotype: user.somatotype || 'mesomorph',
-      trainingSchedule: user.trainingSchedule || [],
-    };
-
-    return NextResponse.json({ user: localUser, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: 'PROFILE_SAVE_FAILED', warning: getErrorMessage(error) }, { status: 503 });
   }
 }
 

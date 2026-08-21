@@ -5,6 +5,14 @@
 ```env
 DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
 
+# Used to hash database session and one-time tokens. Use at least 32 random bytes.
+AUTH_SECRET="replace-with-a-long-random-secret"
+
+APP_URL="http://localhost:3000"
+RESEND_API_KEY="re_xxx"
+RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
+ADMIN_API_KEY="replace-with-a-long-admin-secret"
+
 DEEPSEEK_API_KEY="your_deepseek_api_key"
 DEEPSEEK_BASE_URL="https://api.deepseek.com"
 DEEPSEEK_MODEL="deepseek-v4-pro"
@@ -25,7 +33,7 @@ CRON_SECRET="your_report_cron_secret"
 - `@prisma/adapter-mariadb`
 - `mariadb`
 
-`DATABASE_URL` 必须是 MySQL/MariaDB 连接字符串。API 路由会在请求时懒加载 Prisma Client；没有 `DATABASE_URL` 或数据库不可用时，前端 store 会继续使用 localStorage 兜底。
+`DATABASE_URL` 必须是 MySQL/MariaDB 连接字符串。API 路由会在请求时懒加载 Prisma Client。账号、Session 和个人业务 API 必须使用数据库；数据库不可用时返回错误，不会把 localStorage 当作登录身份或伪造云端保存成功。
 
 本地初始化：
 
@@ -64,6 +72,25 @@ npx prisma migrate deploy
 ```http
 Authorization: Bearer your_report_cron_secret
 ```
+
+Cron 不接受 URL 查询参数传密钥。RAG 导入、索引和 Analytics 管理接口使用同样格式的 `ADMIN_API_KEY` Bearer 请求头。
+
+## Vercel 与 Resend
+
+Production 与 Preview 必须分别配置：
+
+```env
+DATABASE_URL=
+DATABASE_CA_CERT=
+AUTH_SECRET=
+APP_URL=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+CRON_SECRET=
+ADMIN_API_KEY=
+```
+
+不要创建任何 `NEXT_PUBLIC_DATABASE_URL`、`NEXT_PUBLIC_AUTH_SECRET` 或 `NEXT_PUBLIC_RESEND_API_KEY`。Aiven SSL CA 可放在 `DATABASE_CA_CERT`，连接池默认限制为 2，可通过 `DATABASE_CONNECTION_LIMIT` 调整。
 
 Vercel Cron 配置在 `vercel.json`。
 

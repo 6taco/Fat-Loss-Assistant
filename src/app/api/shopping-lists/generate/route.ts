@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateShoppingList } from '@/lib/coach';
 import { dateToISODate } from '@/lib/server-mappers';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface GenerateShoppingListBody {
   userId?: string;
@@ -10,14 +11,16 @@ interface GenerateShoppingListBody {
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as GenerateShoppingListBody;
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
-    const list = await generateShoppingList(body.userId, body.startDate || dateToISODate(new Date()), body.days || 3);
+    const list = await generateShoppingList(userId, body.startDate || dateToISODate(new Date()), body.days || 3);
     return NextResponse.json({
       shoppingList: {
         id: list.id,
-        userId: list.userId,
+        userId,
         startDate: dateToISODate(list.startDate),
         endDate: dateToISODate(list.endDate),
         items: list.items,

@@ -12,6 +12,8 @@
 - 平台期检测可生成热量目标调整、碳循环重排、饮食计划、训练计划和采购清单建议。
 - 所有会修改计划的 AI 建议都需要用户确认后才生效。
 - PWA 支持手机端安装到主屏幕。
+- 邮箱密码账号支持验证邮箱、找回密码、多设备 Session、退出当前设备和退出全部设备。
+- 旧浏览器 localStorage 数据可以通过 `/import-local` 分块导入云端账号。
 
 ## 本地启动
 
@@ -65,7 +67,7 @@ npx prisma generate
 
 - 当前仓库缺少最早的 init migration，因此空库初始化建议使用 `npx prisma db push`。
 - `npx prisma migrate dev` 适合后续补齐完整 migration 历史后再使用。
-- 如果没有 `DATABASE_URL`，部分核心记录仍可先保存在浏览器 localStorage，但 Coach 记忆、建议和报告入库能力不可用。
+- 账号、Session 和个人业务 API 必须配置 `DATABASE_URL`。localStorage 只作为离线缓存和旧数据迁移来源。
 
 ## 环境变量
 
@@ -73,6 +75,12 @@ npx prisma generate
 
 ```env
 DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
+
+AUTH_SECRET="replace-with-a-long-random-secret"
+APP_URL="http://localhost:3000"
+RESEND_API_KEY="re_xxx"
+RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
+ADMIN_API_KEY="replace-with-a-long-admin-secret"
 
 DEEPSEEK_API_KEY="your_deepseek_api_key"
 DEEPSEEK_BASE_URL="https://api.deepseek.com"
@@ -91,14 +99,14 @@ CRON_SECRET="your_report_cron_secret"
 - 不要把 AI key 命名为 `NEXT_PUBLIC_*`，否则会暴露到浏览器端。
 - `DEEPSEEK_API_KEY` 和 `GLM_API_KEY` 只应由服务端 API 读取。
 
-## Netlify 部署
+## Vercel 部署
 
-手机端安装的是 Netlify 上的 PWA。手机不需要保存 AI 密钥，手机只调用 Netlify 上的 API，API 在服务端读取环境变量。
+手机端安装的是 Vercel 上的 PWA。手机不需要保存数据库、邮件或 AI 密钥，浏览器只调用 Vercel Route Handlers。
 
-在 Netlify 项目中进入：
+在 Vercel 项目中进入：
 
 ```text
-Site configuration -> Environment variables -> Add variable
+Project Settings -> Environment Variables
 ```
 
 需要添加：
@@ -119,12 +127,23 @@ GLM_VISION_MODEL=glm-4v-plus-0111
 DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant
 ```
 
+还必须添加：
+
+```env
+AUTH_SECRET=至少32字节随机值
+APP_URL=https://你的正式域名
+RESEND_API_KEY=re_xxx
+RESEND_FROM_EMAIL=轻燃AI <no-reply@你的域名>
+CRON_SECRET=随机密钥
+ADMIN_API_KEY=随机密钥
+```
+
 重要说明：
 
-- Netlify 上的 `localhost` 不是你的电脑，所以不能使用本机 MySQL 的 `localhost:3306` 作为线上数据库。
+- Vercel 上的 `localhost` 不是你的电脑，所以不能使用本机 MySQL 的 `localhost:3306` 作为线上数据库。
 - 线上需要使用云 MySQL/MariaDB，例如 PlanetScale、Aiven、Railway、TiDB Cloud 等。
-- 添加或修改环境变量后，需要重新部署 Netlify。
-- `GLM_API_KEY` 和 `DEEPSEEK_API_KEY` 建议勾选 Netlify 的 `Contains secret values`。
+- Production 与 Preview 应使用不同的 `AUTH_SECRET` 和数据库。
+- Aiven 连接必须启用 SSL；如使用 CA，配置 `DATABASE_CA_CERT`。
 
 ## AI 服务
 
@@ -163,10 +182,10 @@ npx prisma migrate deploy
 
 ## 数据同步说明
 
-- 浏览器 localStorage 作为离线和本地兜底缓存。
-- 数据库可用时，用户资料、计划、体重、饮食会同步到 MySQL。
-- Coach 运行前会尝试把 localStorage 中的用户、计划、体重和饮食补写入数据库，避免空库时出现 `User not found`。
-- 手机端 PWA 如果访问 Netlify，数据是否跨设备同步取决于是否配置了线上云数据库。
+- 浏览器 localStorage 仅作为离线缓存和旧数据迁移来源，不保存登录凭证。
+- 登录身份只来自数据库 Session 和 HttpOnly Cookie。
+- 个人业务 API 数据库写入失败时会明确报错，不会返回伪造的本地成功响应。
+- 本地旧账户数据通过 `/import-local` 选择来源账户后分块导入，重复导入由服务端幂等映射去重。
 
 
 查看数据埋点：http://localhost:3000/analytics

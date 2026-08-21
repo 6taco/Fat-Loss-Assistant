@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import { dayPlanToResponse, toDate } from '@/lib/server-mappers';
-import { DayPlan, mockPlan } from '@/lib/mock-data';
+import { DayPlan } from '@/lib/mock-data';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface PlansBody {
   userId?: string;
@@ -10,8 +11,9 @@ interface PlansBody {
 }
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
@@ -22,14 +24,17 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ plans: plans.map(dayPlanToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ plans: [], source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error), plans: [] }, { status: 503 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as PlansBody;
-  if (!body.userId || !Array.isArray(body.plans)) {
-    return NextResponse.json({ error: 'userId and plans are required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
+  if (!Array.isArray(body.plans)) {
+    return NextResponse.json({ error: 'plans are required' }, { status: 400 });
   }
 
   try {
@@ -39,12 +44,12 @@ export async function POST(request: NextRequest) {
       body.plans.map(plan => prisma.dayPlan.upsert({
         where: {
           userId_date: {
-            userId: body.userId!,
+            userId,
             date: toDate(plan.date),
           },
         },
         create: {
-          userId: body.userId!,
+          userId,
           date: toDate(plan.date),
           carbType: plan.carbType,
           calories: plan.calories,
@@ -77,20 +82,23 @@ export async function POST(request: NextRequest) {
     );
 
     const saved = await prisma.dayPlan.findMany({
-      where: { userId: body.userId },
+      where: { userId },
       orderBy: { date: 'asc' },
     });
 
     return NextResponse.json({ plans: saved.map(dayPlanToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ plans: body.plans, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   const body = (await request.json()) as { userId?: string; date?: string; completed?: boolean };
-  if (!body.userId || !body.date) {
-    return NextResponse.json({ error: 'userId and date are required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
+  if (!body.date) {
+    return NextResponse.json({ error: 'date is required' }, { status: 400 });
   }
 
   try {
@@ -99,7 +107,7 @@ export async function PATCH(request: NextRequest) {
     const plan = await prisma.dayPlan.update({
       where: {
         userId_date: {
-          userId: body.userId,
+          userId,
           date: toDate(body.date),
         },
       },
@@ -110,12 +118,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ plan: dayPlanToResponse(plan), source: 'db' });
   } catch (error) {
-    const fallback = mockPlan.find(plan => plan.date === body.date);
-    return NextResponse.json({
-      plan: fallback ? { ...fallback, completed: body.completed ?? true } : { date: body.date, completed: body.completed ?? true },
-      source: 'local',
-      warning: getErrorMessage(error),
-    });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
