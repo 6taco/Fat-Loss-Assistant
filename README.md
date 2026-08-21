@@ -78,6 +78,7 @@ DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
 
 AUTH_SECRET="replace-with-a-long-random-secret"
 APP_URL="http://localhost:3000"
+# Required only for forgot-password emails.
 RESEND_API_KEY="re_xxx"
 RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
 ADMIN_API_KEY="replace-with-a-long-admin-secret"

@@ -59,7 +59,6 @@ enum AuthUserStatus {
 }
 
 enum AuthTokenType {
-  email_verification
   password_reset
 }
 
@@ -114,7 +113,6 @@ model AuthUser {
   email           String             @unique
   passwordHash    String             @db.VarChar(255)
   status          AuthUserStatus     @default(active)
-  emailVerifiedAt DateTime?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   user            User?
@@ -123,7 +121,6 @@ model AuthUser {
   importBatches   DataImportBatch[]
 
   @@index([status])
-  @@index([emailVerifiedAt])
 }
 
 model Session {

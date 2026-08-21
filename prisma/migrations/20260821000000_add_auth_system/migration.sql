@@ -6,12 +6,10 @@ CREATE TABLE `AuthUser` (
   `email` VARCHAR(191) NOT NULL,
   `passwordHash` VARCHAR(255) NOT NULL,
   `status` ENUM('active', 'disabled') NOT NULL DEFAULT 'active',
-  `emailVerifiedAt` DATETIME(3) NULL,
   `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   `updatedAt` DATETIME(3) NOT NULL,
   UNIQUE INDEX `AuthUser_email_key`(`email`),
   INDEX `AuthUser_status_idx`(`status`),
-  INDEX `AuthUser_emailVerifiedAt_idx`(`emailVerifiedAt`),
   PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -39,7 +37,7 @@ ALTER TABLE `Session` ADD CONSTRAINT `Session_authUserId_fkey` FOREIGN KEY (`aut
 CREATE TABLE `AuthToken` (
   `id` VARCHAR(191) NOT NULL,
   `authUserId` VARCHAR(191) NOT NULL,
-  `type` ENUM('email_verification', 'password_reset') NOT NULL,
+  `type` ENUM('password_reset') NOT NULL,
   `tokenHash` VARCHAR(128) NOT NULL,
   `expiresAt` DATETIME(3) NOT NULL,
   `usedAt` DATETIME(3) NULL,

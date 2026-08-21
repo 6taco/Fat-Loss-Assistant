@@ -13,9 +13,6 @@ export async function requireAuth(request: Request): Promise<AuthResult> {
   if (!context) {
     return { context: null, response: Response.json({ error: 'Authentication required' }, { status: 401 }) };
   }
-  if (!context.emailVerified) {
-    return { context: null, response: Response.json({ error: 'EMAIL_NOT_VERIFIED' }, { status: 403 }) };
-  }
   return { context, response: null };
 }
 

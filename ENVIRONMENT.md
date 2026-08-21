@@ -5,10 +5,11 @@
 ```env
 DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
 
-# Used to hash database session and one-time tokens. Use at least 32 random bytes.
+# Used to hash database session and password-reset tokens. Use at least 32 random bytes.
 AUTH_SECRET="replace-with-a-long-random-secret"
 
 APP_URL="http://localhost:3000"
+# Required only for the forgot-password email flow.
 RESEND_API_KEY="re_xxx"
 RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
 ADMIN_API_KEY="replace-with-a-long-admin-secret"
