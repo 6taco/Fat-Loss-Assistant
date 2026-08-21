@@ -10,7 +10,6 @@ export async function GET(request: NextRequest) {
       user: {
         id: context.authUserId,
         email: context.email,
-        emailVerified: context.emailVerified,
         hasProfile: Boolean(context.userId),
         profileUserId: context.userId,
       },

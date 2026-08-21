@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     await enforceRateLimit({ action: 'register', identifier: getRequestIp(request), limit: 10, windowMs: 60 * 60 * 1_000 });
     await registerAccount(body);
-    return NextResponse.json({ ok: true, status: 'verification_required' });
+    return NextResponse.json({ ok: true, status: 'registered' });
   } catch (error) {
     return authErrorResponse(error);
   }

@@ -8,7 +8,6 @@ import { identifyAnalyticsUser } from '@/lib/analytics/client';
 export interface AuthUserSummary {
   id: string;
   email: string;
-  emailVerified: boolean;
   hasProfile: boolean;
   profileUserId: string | null;
 }

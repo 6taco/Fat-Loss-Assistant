@@ -11,7 +11,6 @@ export interface AuthContext {
   userId: string | null;
   sessionId: string;
   email: string;
-  emailVerified: boolean;
 }
 
 export async function createSession(authUserId: string, request: Request) {
@@ -51,7 +50,6 @@ export async function getSessionFromRequest(request: Request): Promise<AuthConte
     userId: session.authUser.user?.id || null,
     sessionId: session.id,
     email: session.authUser.email,
-    emailVerified: Boolean(session.authUser.emailVerifiedAt),
   };
 }
 

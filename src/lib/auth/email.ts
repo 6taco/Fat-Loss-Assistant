@@ -8,18 +8,6 @@ function getEmailConfig() {
   return { resend: new Resend(apiKey), from, appUrl: appUrl.replace(/\/$/, '') };
 }
 
-export async function sendVerificationEmail(email: string, token: string) {
-  const { resend, from, appUrl } = getEmailConfig();
-  const url = `${appUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-  const { error } = await resend.emails.send({
-    from,
-    to: email,
-    subject: '验证你的轻燃AI邮箱',
-    html: `<p>欢迎使用轻燃AI。</p><p><a href="${url}">验证邮箱</a></p><p>链接将在24小时后失效。</p>`,
-  });
-  if (error) throw new Error(error.message);
-}
-
 export async function sendPasswordResetEmail(email: string, token: string) {
   const { resend, from, appUrl } = getEmailConfig();
   const url = `${appUrl}/auth/reset-password?token=${encodeURIComponent(token)}`;

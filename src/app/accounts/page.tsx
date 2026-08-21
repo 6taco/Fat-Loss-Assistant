@@ -50,10 +50,6 @@ function AccountsContent() {
       });
       const data = await response.json() as { error?: string; message?: string };
       if (!response.ok) {
-        if (data.error === 'EMAIL_NOT_VERIFIED') {
-          showAppToast('邮箱尚未验证，请检查邮箱。', 'error');
-          return;
-        }
         showAppToast(errorMessage(data.error), 'error');
         return;
       }
@@ -64,7 +60,7 @@ function AccountsContent() {
         return;
       }
       if (mode === 'register') {
-        showAppToast('验证邮件已发送，请先完成邮箱验证。', 'success');
+        showAppToast('注册成功，请使用邮箱和密码登录。', 'success');
         setMode('login');
         setPassword('');
         setConfirmPassword('');
@@ -79,22 +75,6 @@ function AccountsContent() {
     }
   };
 
-  const resend = async () => {
-    if (!email.trim()) return showAppToast('请先输入邮箱。', 'error');
-    setIsSubmitting(true);
-    try {
-      await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      showAppToast('如果邮箱需要验证，新的邮件将会发送。', 'success');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const Icon = mode === 'login' ? LogIn : mode === 'register' ? UserPlus : KeyRound;
   return (
     <div className="min-h-dvh px-5 pt-14 pb-10">
@@ -104,7 +84,7 @@ function AccountsContent() {
         </div>
         <h1 className="text-[25px] font-semibold">{mode === 'login' ? '登录轻燃AI' : mode === 'register' ? '创建云端账号' : '找回密码'}</h1>
         <p className="mt-2 text-[14px] leading-6 text-text-secondary">
-          {mode === 'login' ? '登录后可在手机和电脑同步你的体重、饮食、计划和报告。' : mode === 'register' ? '使用邮箱注册，验证成功后开始保存云端数据。' : '输入注册邮箱，我们会发送一封密码重置邮件。'}
+          {mode === 'login' ? '登录后可在手机和电脑同步你的体重、饮食、计划和报告。' : mode === 'register' ? '使用邮箱和密码创建云端账号。' : '输入注册邮箱，我们会发送一封密码重置邮件。'}
         </p>
       </header>
 
@@ -114,7 +94,7 @@ function AccountsContent() {
         {mode === 'register' ? <Field icon={KeyRound} label="确认密码" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" /> : null}
         <Button fullWidth type="submit" disabled={isSubmitting}>
           {isSubmitting ? <LoaderCircle size={18} className="mr-2 animate-spin" /> : <Icon size={18} className="mr-2" />}
-          {mode === 'login' ? '登录' : mode === 'register' ? '注册并发送验证邮件' : '发送重置邮件'}
+          {mode === 'login' ? '登录' : mode === 'register' ? '注册账号' : '发送重置邮件'}
         </Button>
       </form>
 
@@ -122,7 +102,6 @@ function AccountsContent() {
         {mode !== 'login' ? <button className="bg-transparent text-accent-blue" onClick={() => setMode('login')}>返回登录</button> : null}
         {mode === 'login' ? <button className="bg-transparent text-accent-blue" onClick={() => setMode('register')}>注册账号</button> : null}
         {mode === 'login' ? <button className="bg-transparent text-text-secondary" onClick={() => setMode('forgot')}>忘记密码</button> : null}
-        {mode === 'login' ? <button className="bg-transparent text-text-secondary" onClick={resend}>重发验证邮件</button> : null}
       </div>
     </div>
   );
