@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getJson, sendJson } from '@/lib/client-api';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 import type {
@@ -26,9 +26,7 @@ interface StrategyState {
 }
 
 function getLocalUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<{ id?: string } | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<{ id?: string } | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 export const useStrategyStore = create<StrategyState>((set, get) => ({

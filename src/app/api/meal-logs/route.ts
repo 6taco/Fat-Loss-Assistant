@@ -3,14 +3,16 @@ import { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import { mealLogToResponse, toDate } from '@/lib/server-mappers';
 import { calculateMealCalories, MealLog } from '@/lib/mock-data';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface MealBody extends Partial<MealLog> {
   userId?: string;
 }
 
 export async function GET(request: NextRequest) {
-  const userId = request.nextUrl.searchParams.get('userId');
-  if (!userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const prisma = getPrisma();
@@ -21,19 +23,22 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ meals: meals.map(mealLogToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ meals: [], source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error), meals: [] }, { status: 503 });
   }
 }
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as MealBody;
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
   const validation = validateMealBody(body);
   if (validation) return validation;
 
   try {
     const prisma = getPrisma();
     const mealData = {
-      userId: body.userId!,
+      userId,
       date: toDate(body.date!),
       mealType: body.mealType!,
       description: body.description!,
@@ -44,16 +49,16 @@ export async function POST(request: NextRequest) {
       calories: body.calories ?? calculateMealCalories(body as MealLog),
       source: body.source || 'manual',
     };
-    const meal = body.id ? await prisma.mealLog.upsert({
-      where: { id: body.id },
-      create: {
-        id: body.id,
-        ...mealData,
-        createdAt: body.createdAt ? new Date(body.createdAt) : undefined,
-      },
-      update: mealData,
-    }) : await prisma.mealLog.create({
+    if (body.id) {
+      const existing = await prisma.mealLog.findFirst({ where: { id: body.id, userId } });
+      if (existing) {
+        const meal = await prisma.mealLog.update({ where: { id: existing.id }, data: mealData });
+        return NextResponse.json({ meal: mealLogToResponse(meal), source: 'db' });
+      }
+    }
+    const meal = await prisma.mealLog.create({
       data: {
+        id: body.id,
         ...mealData,
         createdAt: body.createdAt ? new Date(body.createdAt) : undefined,
       },
@@ -61,20 +66,25 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ meal: mealLogToResponse(meal), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ meal: body, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
 export async function PATCH(request: NextRequest) {
   const body = (await request.json()) as MealBody;
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
   const validation = validateMealBody(body);
   if (validation) return validation;
   if (!body.id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
   try {
     const prisma = getPrisma();
+    const existing = await prisma.mealLog.findFirst({ where: { id: body.id, userId } });
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const meal = await prisma.mealLog.update({
-      where: { id: body.id },
+      where: { id: existing.id },
       data: {
         date: toDate(body.date!),
         mealType: body.mealType!,
@@ -90,28 +100,31 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ meal: mealLogToResponse(meal), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ meal: body, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
 export async function DELETE(request: NextRequest) {
   const body = (await request.json()) as { id?: string; userId?: string };
-  if (!body.id || !body.userId) {
-    return NextResponse.json({ error: 'id and userId are required' }, { status: 400 });
-  }
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
+  if (!body.id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
 
   try {
     const prisma = getPrisma();
-    await prisma.mealLog.delete({ where: { id: body.id } });
+    const existing = await prisma.mealLog.findFirst({ where: { id: body.id, userId } });
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    await prisma.mealLog.delete({ where: { id: existing.id } });
     return NextResponse.json({ id: body.id, source: 'db' });
   } catch (error) {
-    return NextResponse.json({ id: body.id, source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 
 function validateMealBody(body: MealBody) {
-  if (!body.userId || !body.date || !body.mealType || !body.description) {
-    return NextResponse.json({ error: 'userId, date, mealType and description are required' }, { status: 400 });
+  if (!body.date || !body.mealType || !body.description) {
+    return NextResponse.json({ error: 'date, mealType and description are required' }, { status: 400 });
   }
   if (body.carb === undefined || body.protein === undefined || body.fat === undefined) {
     return NextResponse.json({ error: 'carb, protein and fat are required' }, { status: 400 });

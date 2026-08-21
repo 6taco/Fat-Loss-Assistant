@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getJson } from '@/lib/client-api';
 import { calculateMealCalories, DailyReport, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 
 interface DailyReportState {
@@ -15,9 +15,7 @@ interface DailyReportState {
 }
 
 function getLocalUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 function getShanghaiDate(offsetDays = 0): string {

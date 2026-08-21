@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMealPlans } from '@/lib/coach';
 import { dateToISODate } from '@/lib/server-mappers';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface GenerateMealPlansBody {
   userId?: string;
@@ -10,14 +11,16 @@ interface GenerateMealPlansBody {
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as GenerateMealPlansBody;
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
-    const mealPlans = await generateMealPlans(body.userId, body.startDate || dateToISODate(new Date()), body.days || 3);
+    const mealPlans = await generateMealPlans(userId, body.startDate || dateToISODate(new Date()), body.days || 3);
     return NextResponse.json({
       mealPlans: mealPlans.map(plan => ({
         id: plan.id,
-        userId: plan.userId,
+        userId,
         date: dateToISODate(plan.date),
         meals: plan.meals,
         macros: plan.macros,

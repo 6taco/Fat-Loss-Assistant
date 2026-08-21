@@ -53,8 +53,26 @@ enum ChatRole {
   ai
 }
 
+enum AuthUserStatus {
+  active
+  disabled
+}
+
+enum AuthTokenType {
+  email_verification
+  password_reset
+}
+
+enum DataImportStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
 model User {
   id                String            @id @default(cuid())
+  authUserId        String?           @unique
   name              String
   gender            Gender
   age               Int
@@ -88,6 +106,110 @@ model User {
   trainingPlans     TrainingPlan[]
   shoppingLists     ShoppingList[]
   notificationEvents NotificationEvent[]
+  authUser          AuthUser?         @relation(fields: [authUserId], references: [id], onDelete: SetNull)
+}
+
+model AuthUser {
+  id              String             @id @default(cuid())
+  email           String             @unique
+  passwordHash    String             @db.VarChar(255)
+  status          AuthUserStatus     @default(active)
+  emailVerifiedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User?
+  sessions        Session[]
+  authTokens      AuthToken[]
+  importBatches   DataImportBatch[]
+
+  @@index([status])
+  @@index([emailVerifiedAt])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  authUserId String
+  tokenHash  String   @unique @db.VarChar(128)
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime
+  userAgent  String?  @db.VarChar(512)
+  ipHash     String?  @db.VarChar(128)
+  createdAt  DateTime @default(now())
+  authUser   AuthUser @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+
+  @@index([authUserId, revokedAt])
+  @@index([expiresAt])
+}
+
+model AuthToken {
+  id         String        @id @default(cuid())
+  authUserId String
+  type       AuthTokenType
+  tokenHash  String        @unique @db.VarChar(128)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime      @default(now())
+  authUser   AuthUser      @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+
+  @@index([authUserId, type, createdAt])
+  @@index([expiresAt])
+}
+
+model AuthRateLimit {
+  id              String   @id @default(cuid())
+  scopeKey        String   @unique @db.VarChar(255)
+  action          String   @db.VarChar(64)
+  windowStartedAt DateTime
+  attemptCount    Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@index([action, updatedAt])
+}
+
+model DataImportBatch {
+  id              String           @id @default(cuid())
+  authUserId      String
+  sourceAccountId String?
+  status          DataImportStatus @default(pending)
+  counts          Json?
+  error           String?          @db.Text
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+  authUser        AuthUser         @relation(fields: [authUserId], references: [id], onDelete: Cascade)
+  items           DataImportItem[]
+  chunks          DataImportChunk[]
+
+  @@index([authUserId, createdAt])
+  @@index([status])
+}
+
+model DataImportChunk {
+  id         String          @id @default(cuid())
+  batchId    String
+  dataset    String          @db.VarChar(64)
+  chunkIndex Int
+  payload    Json
+  createdAt  DateTime        @default(now())
+
+  batch      DataImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, dataset, chunkIndex])
+  @@index([batchId, dataset])
+}
+
+model DataImportItem {
+  id         String          @id @default(cuid())
+  authUserId String
+  batchId    String
+  dataset    String          @db.VarChar(64)
+  sourceId   String          @db.VarChar(255)
+  targetId   String
+  createdAt  DateTime        @default(now())
+  batch      DataImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([authUserId, dataset, sourceId])
+  @@index([batchId])
 }
 
 model DayPlan {

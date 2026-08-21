@@ -4,15 +4,11 @@ import { upsertSentReportNotification } from '@/lib/report-notification-store';
 import { buildWeeklyReportNotification } from '@/lib/report-notifications';
 import { dateToISODate } from '@/lib/server-mappers';
 import { generateWeeklyReport, getPreviousClosedWeekIndex } from '@/lib/weekly-report';
+import { requireCron } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get('authorization');
-  const querySecret = request.nextUrl.searchParams.get('secret');
-
-  if (secret && auth !== `Bearer ${secret}` && querySecret !== secret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authResponse = requireCron(request);
+  if (authResponse) return authResponse;
 
   const prisma = getPrisma();
   const users = await prisma.user.findMany({ select: { id: true, startDate: true } });

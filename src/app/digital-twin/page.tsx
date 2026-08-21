@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getScopedKey } from '@/lib/accounts';
 import { getJson, sendJson } from '@/lib/client-api';
 import { syncLocalDataToServer } from '@/lib/client-sync';
 import type { UserProfile } from '@/lib/mock-data';
@@ -43,17 +43,12 @@ const scenarioButtons: Array<{
 export default function DigitalTwinPage() {
   const [twin, setTwin] = useState<DigitalTwinBundle | null>(null);
   const [activeScenario, setActiveScenario] = useState<DigitalTwinScenarioDto | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setUserId(getUserId());
-  }, []);
+  const [isLoading, setIsLoading] = useState(true);
+  const [userId] = useState<string | null>(() => getUserId());
 
   useEffect(() => {
     if (!userId) return;
 
-    setIsLoading(true);
     void syncLocalDataToServer()
       .then(() => getJson<{ twin: DigitalTwinBundle | null }>(`/api/digital-twin?userId=${encodeURIComponent(userId)}`))
       .then(async data => {
@@ -342,9 +337,7 @@ function ForecastChart({ forecast, goalWeight }: { forecast: DigitalTwinForecast
 }
 
 function getUserId() {
-  const account = getActiveAccount();
-  if (!account) return null;
-  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || account.id;
+  return getItem<UserProfile | null>(getScopedKey(KEYS.USER), null)?.id || null;
 }
 
 function getTrendLabel(risk?: string) {

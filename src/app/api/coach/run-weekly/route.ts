@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runWeeklyCoach } from '@/lib/coach';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface RunWeeklyBody {
   userId?: string;
@@ -9,17 +10,19 @@ interface RunWeeklyBody {
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as RunWeeklyBody;
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
-    const result = await runWeeklyCoach({ userId: body.userId, date: body.date, force: Boolean(body.force) });
+    const result = await runWeeklyCoach({ userId, date: body.date, force: Boolean(body.force) });
     return NextResponse.json({ ...result, source: 'db' });
   } catch (error) {
     return NextResponse.json({
       feed: { insights: [], proposals: [], notifications: [], memories: [] },
-      source: 'local',
+      source: 'db',
       warning: getErrorMessage(error),
-    });
+    }, { status: 503 });
   }
 }
 

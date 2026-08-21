@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { dayPlanToResponse, toDate } from '@/lib/server-mappers';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface DayCompleteBody {
   userId?: string;
@@ -15,21 +16,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Date is required' }, { status: 400 });
   }
 
-  if (!body.userId) {
-    return NextResponse.json({
-      date: body.date,
-      completed: body.completed ?? true,
-      updatedAt: new Date().toISOString(),
-      source: 'local',
-    });
-  }
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
 
   try {
     const prisma = getPrisma();
     const plan = await prisma.dayPlan.update({
       where: {
         userId_date: {
-          userId: body.userId,
+          userId: auth.context.userId!,
           date: toDate(body.date),
         },
       },
@@ -40,13 +35,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ plan: dayPlanToResponse(plan), source: 'db' });
   } catch (error) {
-    return NextResponse.json({
-      date: body.date,
-      completed: body.completed ?? true,
-      updatedAt: new Date().toISOString(),
-      source: 'local',
-      warning: getErrorMessage(error),
-    });
+    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
   }
 }
 

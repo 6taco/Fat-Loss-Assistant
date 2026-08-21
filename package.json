@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev --turbopack",
+    "test": "node --test src/lib/*.test.mjs src/lib/auth/*.test.mjs",
+    "test:auth": "node --test src/lib/auth-policy.test.mjs src/lib/auth/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run test && npm run typecheck && npm run lint && npm run build",
     "prebuild": "prisma generate",
     "build": "next build",
     "start": "next start",
@@ -27,6 +31,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
+    "resend": "^6.20.0",
     "zustand": "^5.0.13"
   },
   "devDependencies": {

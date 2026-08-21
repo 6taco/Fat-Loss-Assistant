@@ -24,7 +24,8 @@ import RingChart from '@/components/ui/RingChart';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { track } from '@/lib/analytics/client';
 import { clearLocalAppData, downloadLocalAppData } from '@/lib/app-data';
-import { clearActiveAccount, getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { useAuth } from '@/components/auth/AuthProvider';
 import { getItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
@@ -60,6 +61,7 @@ const carbTip: Record<CarbType, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const auth = useAuth();
   const { user, loadUser } = useUserStore();
   const { plans, loadPlans, toggleComplete } = usePlanStore();
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
@@ -325,21 +327,29 @@ export default function DashboardPage() {
             <button
               onClick={() => {
                 setShowSettings(false);
-                router.push('/accounts');
+                router.push('/import-local');
               }}
               className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
             >
-              切换账户
+              导入本地数据
             </button>
             <button
               onClick={() => {
-                clearActiveAccount();
+                void auth.logout(false);
                 showAppToast('已退出当前账户。', 'success');
-                router.push('/accounts');
               }}
               className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
             >
-              退出当前账户
+              退出当前设备
+            </button>
+            <button
+              onClick={() => {
+                void auth.logout(true);
+                showAppToast('所有设备已退出。', 'success');
+              }}
+              className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
+            >
+              退出全部设备
             </button>
             <button
               onClick={() => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runAgentWorkflow } from '@/lib/agents/orchestrator';
 import type { AgentIntent, AgentRunType } from '@/lib/agents/types';
+import { requireBusinessUser } from '@/lib/auth-server';
 
 interface AgentRunBody {
   userId?: string;
@@ -13,11 +14,13 @@ interface AgentRunBody {
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as AgentRunBody;
-  if (!body.userId) return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+  const auth = await requireBusinessUser(request, body.userId);
+  if (auth.response) return auth.response;
+  const userId = auth.context.userId!;
 
   try {
     const result = await runAgentWorkflow({
-      userId: body.userId,
+      userId,
       runType: body.runType || 'manual',
       date: body.date,
       intent: body.intent,

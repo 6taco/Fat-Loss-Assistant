@@ -6,6 +6,7 @@ import DataInitProvider from '@/components/providers/DataInitProvider';
 import TabBar from '@/components/layout/TabBar';
 import ToastHost from '@/components/ui/ToastHost';
 import PWAInstallSheet from '@/components/pwa/PWAInstallSheet';
+import AuthProvider from '@/components/auth/AuthProvider';
 
 export const metadata: Metadata = {
   title: '轻燃AI',
@@ -44,14 +45,16 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-dvh bg-bg-primary text-text-primary font-sans">
-        <main className="max-w-[430px] mx-auto relative min-h-dvh">
-          <DataInitProvider />
-          <AnalyticsProvider />
-          {children}
-        </main>
-        <TabBar />
-        <ToastHost />
-        <PWAInstallSheet />
+        <AuthProvider>
+          <main className="max-w-[430px] mx-auto relative min-h-dvh">
+            <DataInitProvider />
+            <AnalyticsProvider />
+            {children}
+          </main>
+          <TabBar />
+          <ToastHost />
+          <PWAInstallSheet />
+        </AuthProvider>
         <Script src="/sw-register.js" strategy="afterInteractive" />
       </body>
     </html>

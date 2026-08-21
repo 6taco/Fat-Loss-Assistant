@@ -1,117 +1,150 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { LogIn, Plus, UserRound } from 'lucide-react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { KeyRound, LoaderCircle, LogIn, Mail, UserPlus } from 'lucide-react';
 import Button from '@/components/ui/Button';
-import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
-import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
-import { Account, createAccount, getAccounts, setActiveAccount, validateAccountName } from '@/lib/accounts';
-import { getItem, KEYS } from '@/lib/storage';
-import { UserProfile } from '@/lib/mock-data';
+import { useAuth } from '@/components/auth/AuthProvider';
+
+type Mode = 'login' | 'register' | 'forgot';
 
 export default function AccountsPage() {
+  return <Suspense fallback={<div className="min-h-dvh" />}><AccountsContent /></Suspense>;
+}
+
+function AccountsContent() {
   const router = useRouter();
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [name, setName] = useState('');
+  const searchParams = useSearchParams();
+  const auth = useAuth();
+  const [mode, setMode] = useState<Mode>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setAccounts(getSortedAccounts());
-  }, []);
+    if (auth.status === 'authenticated') router.replace(auth.user.hasProfile ? '/dashboard' : '/onboarding');
+  }, [auth, router]);
 
-  const goNext = (accountId: string) => {
-    const user = getItem<UserProfile | null>(`fla:${accountId}:${KEYS.USER}`, null);
-    router.push(user ? '/dashboard' : '/onboarding');
-  };
+  useEffect(() => {
+    if (searchParams.get('verified') === '1') showAppToast('邮箱验证成功，请登录。', 'success');
+    if (searchParams.get('verified') === '0') showAppToast('验证链接无效或已过期。', 'error');
+    if (searchParams.get('reason') === 'session_expired') showAppToast('登录状态已过期，请重新登录。', 'error');
+  }, [searchParams]);
 
-  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const error = validateAccountName(name, accounts);
-    if (error) {
-      showAppToast(error, 'error');
-      return;
-    }
+    if (!email.trim()) return showAppToast('请输入邮箱。', 'error');
+    if (mode !== 'forgot' && password.length < 8) return showAppToast('密码至少需要 8 个字符。', 'error');
+    if (mode === 'register' && password !== confirmPassword) return showAppToast('两次输入的密码不一致。', 'error');
 
+    setIsSubmitting(true);
     try {
-      const account = createAccount(name);
-      identifyAnalyticsUser(account.id);
-      track('sign_up', { channel: 'local_account', account_type: 'local' }, { userId: account.id });
-      showAppToast('账户已创建。', 'success');
-      goNext(account.id);
-    } catch (error) {
-      showAppToast(error instanceof Error ? error.message : '创建账户失败。', 'error');
+      const endpoint = mode === 'login' ? '/api/auth/login' : mode === 'register' ? '/api/auth/register' : '/api/auth/forgot-password';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mode === 'forgot' ? { email } : { email, password }),
+      });
+      const data = await response.json() as { error?: string; message?: string };
+      if (!response.ok) {
+        if (data.error === 'EMAIL_NOT_VERIFIED') {
+          showAppToast('邮箱尚未验证，请检查邮箱。', 'error');
+          return;
+        }
+        showAppToast(errorMessage(data.error), 'error');
+        return;
+      }
+
+      if (mode === 'login') {
+        const next = await auth.refresh();
+        if (next.status === 'authenticated') router.replace(next.user.hasProfile ? '/dashboard' : '/onboarding');
+        return;
+      }
+      if (mode === 'register') {
+        showAppToast('验证邮件已发送，请先完成邮箱验证。', 'success');
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        return;
+      }
+      showAppToast(data.message || '如果邮箱已注册，重置邮件将会发送。', 'success');
+      setMode('login');
+    } catch {
+      showAppToast('网络请求失败，请稍后重试。', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleSelect = (id: string) => {
-    const account = setActiveAccount(id);
-    if (!account) {
-      showAppToast('账户不存在，请重新创建。', 'error');
-      setAccounts(getAccounts());
-      return;
+  const resend = async () => {
+    if (!email.trim()) return showAppToast('请先输入邮箱。', 'error');
+    setIsSubmitting(true);
+    try {
+      await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      showAppToast('如果邮箱需要验证，新的邮件将会发送。', 'success');
+    } finally {
+      setIsSubmitting(false);
     }
-    identifyAnalyticsUser(account.id);
-    goNext(account.id);
   };
 
+  const Icon = mode === 'login' ? LogIn : mode === 'register' ? UserPlus : KeyRound;
   return (
     <div className="min-h-dvh px-5 pt-14 pb-10">
-      <div className="mb-8">
-        <div className="w-12 h-12 rounded-2xl gradient-accent flex items-center justify-center mb-4">
-          <UserRound size={24} className="text-white" />
+      <header className="mb-8">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl gradient-accent text-white">
+          <Icon size={23} />
         </div>
-        <h1 className="text-[24px] font-semibold mb-2">选择账户</h1>
-        <p className="text-[14px] text-text-secondary leading-relaxed">
-          每个账户的数据会单独保存在这台设备上，体重、饮食、计划和聊天记录不会混在一起。
+        <h1 className="text-[25px] font-semibold">{mode === 'login' ? '登录轻燃AI' : mode === 'register' ? '创建云端账号' : '找回密码'}</h1>
+        <p className="mt-2 text-[14px] leading-6 text-text-secondary">
+          {mode === 'login' ? '登录后可在手机和电脑同步你的体重、饮食、计划和报告。' : mode === 'register' ? '使用邮箱注册，验证成功后开始保存云端数据。' : '输入注册邮箱，我们会发送一封密码重置邮件。'}
         </p>
-      </div>
+      </header>
 
-      <form onSubmit={handleCreate} className="mb-7">
-        <label className="text-[13px] text-text-secondary font-medium block mb-2.5">新账户名</label>
-        <div className="glass-card rounded-xl px-4 py-3.5 mb-3">
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="例如：张三"
-            className="bg-transparent border-none outline-none text-[16px] w-full text-text-primary"
-            maxLength={20}
-          />
-        </div>
-        <Button fullWidth type="submit">
-          <Plus size={18} className="mr-2" />
-          创建并进入
+      <form onSubmit={submit} className="space-y-4">
+        <Field icon={Mail} label="邮箱" type="email" value={email} onChange={setEmail} autoComplete="email" />
+        {mode !== 'forgot' ? <Field icon={KeyRound} label="密码" type="password" value={password} onChange={setPassword} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /> : null}
+        {mode === 'register' ? <Field icon={KeyRound} label="确认密码" type="password" value={confirmPassword} onChange={setConfirmPassword} autoComplete="new-password" /> : null}
+        <Button fullWidth type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <LoaderCircle size={18} className="mr-2 animate-spin" /> : <Icon size={18} className="mr-2" />}
+          {mode === 'login' ? '登录' : mode === 'register' ? '注册并发送验证邮件' : '发送重置邮件'}
         </Button>
       </form>
 
-      {accounts.length > 0 && (
-        <div>
-          <p className="text-[13px] text-text-secondary font-medium mb-3">已有账户</p>
-          <div className="flex flex-col gap-3">
-            {accounts.map(account => (
-              <GlassCard key={account.id} padding="p-4" className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[15px] font-semibold truncate">{account.name}</p>
-                  <p className="text-[11px] text-text-tertiary mt-1">
-                    上次使用 {new Date(account.lastActiveAt).toLocaleDateString('zh-CN')}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleSelect(account.id)}
-                  className="w-10 h-10 rounded-full bg-glass border border-white/10 flex items-center justify-center text-accent-blue shrink-0"
-                  aria-label={`进入 ${account.name}`}
-                >
-                  <LogIn size={18} />
-                </button>
-              </GlassCard>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-3 text-[13px]">
+        {mode !== 'login' ? <button className="bg-transparent text-accent-blue" onClick={() => setMode('login')}>返回登录</button> : null}
+        {mode === 'login' ? <button className="bg-transparent text-accent-blue" onClick={() => setMode('register')}>注册账号</button> : null}
+        {mode === 'login' ? <button className="bg-transparent text-text-secondary" onClick={() => setMode('forgot')}>忘记密码</button> : null}
+        {mode === 'login' ? <button className="bg-transparent text-text-secondary" onClick={resend}>重发验证邮件</button> : null}
+      </div>
     </div>
   );
 }
 
-function getSortedAccounts() {
-  return getAccounts().sort((a, b) => b.lastActiveAt.localeCompare(a.lastActiveAt));
+function Field({ icon: Icon, label, type, value, onChange, autoComplete }: { icon: typeof Mail; label: string; type: string; value: string; onChange: (value: string) => void; autoComplete: string }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-[13px] font-medium text-text-secondary">{label}</span>
+      <span className="glass-card flex items-center gap-3 rounded-xl px-4 py-3.5">
+        <Icon size={18} className="shrink-0 text-text-tertiary" />
+        <input type={type} value={value} onChange={event => onChange(event.target.value)} autoComplete={autoComplete} className="w-full border-none bg-transparent text-[16px] outline-none" />
+      </span>
+    </label>
+  );
+}
+
+function errorMessage(code?: string) {
+  if (code === 'INVALID_CREDENTIALS') return '邮箱或密码不正确。';
+  if (code === 'INVALID_EMAIL') return '请输入有效邮箱。';
+  if (code === 'INVALID_PASSWORD') return '密码需要 8-128 个字符，且不能与邮箱相同。';
+  if (code === 'AUTH_RATE_LIMITED') return '尝试次数过多，请稍后再试。';
+  if (code === 'AUTH_SERVICE_UNAVAILABLE') return '账号服务暂时不可用，请稍后重试。';
+  return '请求失败，请稍后重试。';
 }

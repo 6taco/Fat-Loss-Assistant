@@ -7,8 +7,8 @@ import { Brain, ChevronLeft, Dumbbell, Moon, Plus, Scale, Target, Trash2, Utensi
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
-import { getActiveAccount } from '@/lib/accounts';
 import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   buildTrainingCycleByFrequency,
   appendTrainingCycleDay,
@@ -86,6 +86,7 @@ const initialForm: FormState = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const auth = useAuth();
   const { setUser } = useUserStore();
   const { setPlans } = usePlanStore();
   const { addEntry } = useWeightStore();
@@ -96,14 +97,18 @@ export default function OnboardingPage() {
   const [selectedStrategy, setSelectedStrategy] = useState<FatLossStrategyType | null>(null);
 
   useEffect(() => {
-    const account = getActiveAccount();
-    if (!account) {
+    if (auth.status === 'anonymous') {
       router.replace('/accounts');
       return;
     }
-    identifyAnalyticsUser(account.id);
-    track('onboarding_start', { step_count: TOTAL_STEPS }, { userId: account.id });
-  }, [router]);
+    if (auth.status !== 'authenticated') return;
+    if (auth.user.hasProfile) {
+      router.replace('/dashboard');
+      return;
+    }
+    identifyAnalyticsUser(auth.user.id);
+    track('onboarding_start', { step_count: TOTAL_STEPS }, { userId: auth.user.id });
+  }, [auth, router]);
 
   const numeric = useMemo(() => ({
     age: Number.parseInt(form.age, 10),
@@ -174,21 +179,24 @@ export default function OnboardingPage() {
       return;
     }
 
-    const account = getActiveAccount();
-    if (!account) {
+    if (auth.status !== 'authenticated') {
       router.push('/accounts');
       return;
     }
 
-    const user = buildUser(account.id, account.name, form, numeric);
+    const user = buildUser('', auth.user.email.split('@')[0] || '用户', form, numeric);
 
     if (step === 5) {
-      identifyAnalyticsUser(user.id);
-      await setUser(user);
+      const savedUser = await setUser(user);
+      if (!savedUser) {
+        showAppToast('个人资料保存失败，请稍后重试。', 'error');
+        return;
+      }
+      identifyAnalyticsUser(savedUser.id);
       await saveLifestyle(lifestyleProfile);
       const result = await recommend(lifestyleProfile);
       const fallbackRecommendation = recommendFatLossStrategy({
-        user,
+        user: savedUser,
         lifestyle: lifestyleProfile,
         date: today(),
       });
@@ -199,7 +207,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    await finishOnboarding(user);
+    const savedUser = useUserStore.getState().user;
+    if (!savedUser) {
+      showAppToast('个人资料尚未保存，请返回上一步重试。', 'error');
+      return;
+    }
+    await finishOnboarding(savedUser);
   };
 
   const finishOnboarding = async (user: UserProfile) => {

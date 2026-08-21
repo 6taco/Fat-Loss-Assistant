@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth-server';
 
 export async function GET(request: NextRequest) {
+  const authResponse = requireAdmin(request);
+  if (authResponse) return authResponse;
   const limit = Number(request.nextUrl.searchParams.get('limit') || 50);
 
   try {
