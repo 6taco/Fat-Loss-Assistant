@@ -124,6 +124,8 @@ function errorMessage(code?: string) {
   if (code === 'INVALID_EMAIL') return '请输入有效邮箱。';
   if (code === 'INVALID_PASSWORD') return '密码需要 8-128 个字符，且不能与邮箱相同。';
   if (code === 'AUTH_RATE_LIMITED') return '尝试次数过多，请稍后再试。';
-  if (code === 'AUTH_SERVICE_UNAVAILABLE') return '账号服务暂时不可用，请稍后重试。';
+  if (code === 'AUTH_DATABASE_NOT_CONFIGURED') return '账号服务尚未配置数据库。请先配置 Aiven 的 DATABASE_URL。';
+  if (code === 'AUTH_DATABASE_MIGRATION_REQUIRED') return '账号数据表尚未创建。请先执行 Prisma 认证迁移。';
+  if (code === 'AUTH_DATABASE_UNAVAILABLE' || code === 'AUTH_SERVICE_UNAVAILABLE') return '账号数据库暂时不可用，请检查 Aiven 连接后重试。';
   return '请求失败，请稍后重试。';
 }
