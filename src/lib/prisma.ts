@@ -11,7 +11,11 @@ export function getPrisma() {
   }
 
   if (!globalForPrisma.prisma) {
-    const adapter = new PrismaMariaDb(buildMariaDbConfig(databaseUrl));
+    const adapter = new PrismaMariaDb(buildMariaDbConfig(databaseUrl), {
+      // The MariaDB text protocol avoids an extra prepared-statement round trip
+      // per query on the remote Aiven connection.
+      useTextProtocol: true,
+    });
     globalForPrisma.prisma = new PrismaClient({
       adapter,
       errorFormat: 'minimal',
@@ -34,6 +38,9 @@ export function buildMariaDbConfig(databaseUrl: string): ConstructorParameters<t
     database: url.pathname.replace(/^\//, ''),
     connectionLimit: Number(process.env.DATABASE_CONNECTION_LIMIT || 2),
     minimumIdle: 0,
+    // Aiven's remote TLS round-trip is expensive. Avoid a validation ping before
+    // every query while retaining periodic connection validation.
+    minDelayValidation: Number(process.env.DATABASE_MIN_DELAY_VALIDATION_MS || 30_000),
     prepareCacheLength: 0,
     acquireTimeout: Number(process.env.DATABASE_ACQUIRE_TIMEOUT_MS || 20000),
     connectTimeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_MS || 10000),
