@@ -79,8 +79,13 @@ DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant"
 AUTH_SECRET="replace-with-a-long-random-secret"
 APP_URL="http://localhost:3000"
 # Required only for forgot-password emails.
-RESEND_API_KEY="re_xxx"
-RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
+EMAIL_PROVIDER="smtp"
+EMAIL_FROM="轻燃AI <your-qq-number@qq.com>"
+SMTP_HOST="smtp.qq.com"
+SMTP_PORT="465"
+SMTP_SECURE="true"
+SMTP_USER="your-qq-number@qq.com"
+SMTP_PASS="QQ邮箱授权码"
 ADMIN_API_KEY="replace-with-a-long-admin-secret"
 
 DEEPSEEK_API_KEY="your_deepseek_api_key"
@@ -133,8 +138,13 @@ DATABASE_URL=mysql://USER:PASSWORD@HOST:3306/fat_loss_assistant
 ```env
 AUTH_SECRET=至少32字节随机值
 APP_URL=https://你的正式域名
-RESEND_API_KEY=re_xxx
-RESEND_FROM_EMAIL=轻燃AI <no-reply@你的域名>
+EMAIL_PROVIDER=smtp
+EMAIL_FROM=轻燃AI <你的QQ邮箱@qq.com>
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=你的QQ邮箱@qq.com
+SMTP_PASS=QQ邮箱授权码
 CRON_SECRET=随机密钥
 ADMIN_API_KEY=随机密钥
 ```

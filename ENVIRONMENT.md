@@ -10,6 +10,14 @@ AUTH_SECRET="replace-with-a-long-random-secret"
 
 APP_URL="http://localhost:3000"
 # Required only for the forgot-password email flow.
+EMAIL_PROVIDER="smtp"
+EMAIL_FROM="轻燃AI <your-qq-number@qq.com>"
+SMTP_HOST="smtp.qq.com"
+SMTP_PORT="465"
+SMTP_SECURE="true"
+SMTP_USER="your-qq-number@qq.com"
+SMTP_PASS="QQ邮箱授权码"
+# 仅使用 Resend 时填写：
 RESEND_API_KEY="re_xxx"
 RESEND_FROM_EMAIL="轻燃AI <no-reply@example.com>"
 ADMIN_API_KEY="replace-with-a-long-admin-secret"
@@ -85,6 +93,13 @@ DATABASE_URL=
 DATABASE_CA_CERT=
 AUTH_SECRET=
 APP_URL=
+EMAIL_PROVIDER=smtp
+EMAIL_FROM=
+SMTP_HOST=smtp.qq.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=
+SMTP_PASS=
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 CRON_SECRET=
