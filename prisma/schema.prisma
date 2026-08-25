@@ -164,6 +164,22 @@ model AuthRateLimit {
   @@index([action, updatedAt])
 }
 
+model RegistrationChallenge {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @db.VarChar(255)
+  codeHash     String    @db.VarChar(128)
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  lastSentAt   DateTime  @default(now())
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([expiresAt])
+  @@index([consumedAt])
+}
+
 model DataImportBatch {
   id              String           @id @default(cuid())
   authUserId      String

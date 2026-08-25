@@ -3,7 +3,7 @@ import { authErrorResponse } from '@/lib/auth/errors';
 import { withAuthDatabaseRetry } from '@/lib/auth/database-retry.js';
 import { enforceRateLimit } from '@/lib/auth/rate-limit';
 import { getRequestIp } from '@/lib/auth/request';
-import { registerAccount } from '@/lib/auth/service';
+import { verifyRegistrationCode } from '@/lib/auth/service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       limit: 10,
       windowMs: 60 * 60 * 1_000,
     }));
-    await withAuthDatabaseRetry(() => registerAccount(body));
+    await withAuthDatabaseRetry(() => verifyRegistrationCode(body.email || '', body.code || ''));
     return NextResponse.json({ ok: true, status: 'registered' });
   } catch (error) {
     return authErrorResponse(error);

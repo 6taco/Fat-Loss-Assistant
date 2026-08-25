@@ -1,14 +1,17 @@
 import { getPrisma } from '@/lib/prisma';
 import { AuthError } from '@/lib/auth/errors';
-import { sendPasswordResetEmail } from '@/lib/auth/email';
+import { sendPasswordResetEmail, sendRegistrationCodeEmail } from '@/lib/auth/email';
 import { hashPassword, verifyPassword } from '@/lib/auth/password.js';
 import { createRawToken, hashToken } from '@/lib/auth/tokens.js';
+import { createRegistrationCode, hashRegistrationCode, isRegistrationCode, registrationCodeMatches } from '@/lib/auth/registration-code.js';
 import { normalizeEmail, validateEmail, validatePassword } from '@/lib/auth/validation.js';
 import { createSession, revokeAllSessions } from '@/lib/auth/session';
 
 const RESET_TTL_MS = 60 * 60 * 1_000;
+const REGISTRATION_CODE_TTL_MS = 10 * 60 * 1_000;
+const MAX_REGISTRATION_CODE_ATTEMPTS = 5;
 
-export async function registerAccount(input: { email?: string; password?: string }) {
+export async function requestRegistrationCode(input: { email?: string; password?: string }) {
   const email = normalizeEmail(input.email || '');
   const emailError = validateEmail(email);
   const passwordError = validatePassword(input.password || '', email);
@@ -20,7 +23,72 @@ export async function registerAccount(input: { email?: string; password?: string
   if (existing) return;
 
   const passwordHash = await hashPassword(input.password!);
-  await prisma.authUser.create({ data: { email, passwordHash } });
+  const code = createRegistrationCode();
+  const now = new Date();
+  await prisma.registrationChallenge.upsert({
+    where: { email },
+    create: {
+      email,
+      passwordHash,
+      codeHash: hashRegistrationCode(code),
+      expiresAt: new Date(now.getTime() + REGISTRATION_CODE_TTL_MS),
+      attemptCount: 0,
+      lastSentAt: now,
+    },
+    update: {
+      passwordHash,
+      codeHash: hashRegistrationCode(code),
+      expiresAt: new Date(now.getTime() + REGISTRATION_CODE_TTL_MS),
+      attemptCount: 0,
+      consumedAt: null,
+      lastSentAt: now,
+    },
+  });
+  await sendRegistrationCodeEmail(email, code);
+}
+
+export async function verifyRegistrationCode(emailInput: string, code: string) {
+  const email = normalizeEmail(emailInput);
+  if (validateEmail(email)) throw new AuthError('INVALID_EMAIL', 400);
+  if (!isRegistrationCode(code)) throw new AuthError('INVALID_REGISTRATION_CODE', 400);
+
+  const prisma = getPrisma();
+  const challenge = await prisma.registrationChallenge.findUnique({ where: { email } });
+  const now = new Date();
+  if (!challenge || challenge.consumedAt || challenge.expiresAt <= now) {
+    throw new AuthError('REGISTRATION_CODE_EXPIRED', 400);
+  }
+  if (challenge.attemptCount >= MAX_REGISTRATION_CODE_ATTEMPTS) {
+    throw new AuthError('REGISTRATION_CODE_ATTEMPTS_EXCEEDED', 429);
+  }
+  if (!registrationCodeMatches(code, challenge.codeHash)) {
+    await prisma.registrationChallenge.update({
+      where: { id: challenge.id },
+      data: { attemptCount: { increment: 1 } },
+    });
+    throw new AuthError('INVALID_REGISTRATION_CODE', 400);
+  }
+
+  try {
+    await prisma.$transaction(async tx => {
+      const existing = await tx.authUser.findUnique({ where: { email } });
+      if (existing) throw new AuthError('EMAIL_ALREADY_REGISTERED', 409);
+      const consumed = await tx.registrationChallenge.updateMany({
+        where: {
+          id: challenge.id,
+          consumedAt: null,
+          expiresAt: { gt: now },
+          attemptCount: { lt: MAX_REGISTRATION_CODE_ATTEMPTS },
+        },
+        data: { consumedAt: now },
+      });
+      if (consumed.count !== 1) throw new AuthError('REGISTRATION_CODE_EXPIRED', 400);
+      await tx.authUser.create({ data: { email, passwordHash: challenge.passwordHash } });
+    });
+  } catch (error) {
+    if (error instanceof AuthError) throw error;
+    throw error;
+  }
 }
 
 export async function loginAccount(input: { email?: string; password?: string }, request: Request) {
