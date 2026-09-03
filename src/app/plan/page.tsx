@@ -60,11 +60,12 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function PlanPage() {
   const { plans, loadPlans } = usePlanStore();
-  const { currentStrategy, recommendation, executionRate, loadCurrent } = useStrategyStore();
+  const { currentStrategy, recommendation, executionRate, loadCurrent, activate } = useStrategyStore();
   const [mealPlans, setMealPlans] = useState<MealPlanResult[]>([]);
   const [trainingPlan, setTrainingPlan] = useState<TrainingPlanResult | null>(null);
   const [shoppingList, setShoppingList] = useState<ShoppingListResult | null>(null);
   const [generating, setGenerating] = useState<'meals' | 'training' | 'shopping' | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     loadPlans();
@@ -79,6 +80,28 @@ export default function PlanPage() {
     return () => window.clearTimeout(timer);
   }, [loadPlans, loadCurrent]);
 
+  const strategyType = currentStrategy?.strategyType || recommendation?.strategyType || plans[0]?.strategyType || 'carb_cycling';
+  const todayStr = todayIso();
+  const upcomingPlan = plans.find(plan => plan.date >= todayStr);
+  const todayCovered = plans.some(plan => plan.date === todayStr);
+  // The generation APIs need day plans covering the start date; with stale or
+  // gappy plan data, anchor on the nearest upcoming plan instead of today.
+  const toolStartDate = upcomingPlan?.date || todayStr;
+
+  const regeneratePlans = async () => {
+    setRegenerating(true);
+    try {
+      const result = await activate(strategyType);
+      if (!result) throw new Error('策略激活失败');
+      await loadPlans();
+      showAppToast('已从今天重新生成每日计划。', 'success');
+    } catch {
+      showAppToast('重新生成失败，请稍后再试。', 'error');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   const generate = async (kind: 'meals' | 'training' | 'shopping') => {
     setGenerating(kind);
     try {
@@ -86,7 +109,7 @@ export default function PlanPage() {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startDate: todayIso() }),
+        body: JSON.stringify({ startDate: toolStartDate }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '生成失败');
@@ -94,11 +117,11 @@ export default function PlanPage() {
       if (kind === 'meals' && Array.isArray(data.mealPlans)) {
         setMealPlans(data.mealPlans);
         setItem(getScopedKey(KEYS.MEAL_PLAN_TOOL), data.mealPlans);
-        showAppToast('3 天餐单已生成。', 'success');
+        showAppToast('餐单已生成。', 'success');
       } else if (kind === 'training' && data.trainingPlan) {
         setTrainingPlan(data.trainingPlan);
         setItem(getScopedKey(KEYS.TRAINING_PLAN_TOOL), data.trainingPlan);
-        showAppToast('7 天训练安排已生成。', 'success');
+        showAppToast('训练安排已生成。', 'success');
       } else if (kind === 'shopping' && data.shoppingList) {
         setShoppingList(data.shoppingList);
         setItem(getScopedKey(KEYS.SHOPPING_LIST_TOOL), data.shoppingList);
@@ -107,15 +130,13 @@ export default function PlanPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '生成失败';
       const hint = message.includes('没有可用于生成')
-        ? '当前日期范围内还没有每日计划，请先在首页完成打卡或重新生成策略计划。'
+        ? '所选日期范围内没有每日计划，可先点「从今天重新生成计划」后再试。'
         : message;
       showAppToast(hint, 'error');
     } finally {
       setGenerating(null);
     }
   };
-
-  const strategyType = currentStrategy?.strategyType || recommendation?.strategyType || plans[0]?.strategyType || 'carb_cycling';
   const { plans: weekPlans, weekNumber, startIndex } = getPlanWeek(plans);
   const highDays = weekPlans.filter(plan => plan.carbType === 'high').length;
   const midDays = weekPlans.filter(plan => plan.carbType === 'mid').length;
@@ -207,6 +228,24 @@ export default function PlanPage() {
           );
         })}
       </div>
+
+      {!todayCovered && (
+        <GlassCard className="mb-4" padding="p-4">
+          <p className="text-[13px] font-semibold mb-1">每日计划未覆盖今天</p>
+          <p className="text-[12px] text-text-secondary leading-relaxed mb-3">
+            {upcomingPlan
+              ? `最近的未来计划是 ${upcomingPlan.date}，中间存在日期缺口，上方每日目标因此不连续。AI 计划工具将从 ${upcomingPlan.date} 开始生成。`
+              : '现有计划都已过期，AI 计划工具暂时无法生成餐单、训练安排或采购清单。'}
+          </p>
+          <button
+            onClick={() => void regeneratePlans()}
+            disabled={regenerating}
+            className="w-full py-2.5 rounded-xl gradient-accent text-white text-[13px] font-medium cursor-pointer border-none disabled:opacity-60"
+          >
+            {regenerating ? '正在重新生成…' : '从今天重新生成计划'}
+          </button>
+        </GlassCard>
+      )}
 
       <p className="text-[13px] text-text-secondary font-medium mb-3">AI 计划工具</p>
       <div className="grid grid-cols-3 gap-2 mb-4">
@@ -321,11 +360,11 @@ function ToolButton({ icon: Icon, label, hint, loading, onClick }: {
     <button
       onClick={onClick}
       disabled={loading}
-      className="rounded-xl border border-border-glass bg-white/[0.045] px-2 py-3 flex flex-col items-center gap-1 cursor-pointer disabled:opacity-60 active:scale-[0.98] transition-transform"
+      className="rounded-xl border border-border-glass bg-white/[0.045] px-3 py-3.5 flex flex-col items-center gap-1.5 cursor-pointer disabled:opacity-60 active:scale-[0.98] transition-transform overflow-hidden"
     >
       <Icon size={18} className={loading ? 'animate-pulse text-accent-blue' : 'text-accent-blue'} />
-      <span className="text-[12px] font-medium">{loading ? '生成中…' : label}</span>
-      <span className="text-[10px] text-text-tertiary">{hint}</span>
+      <span className="text-[12px] font-medium whitespace-nowrap">{loading ? '生成中…' : label}</span>
+      <span className="text-[10px] text-text-tertiary whitespace-nowrap">{hint}</span>
     </button>
   );
 }
