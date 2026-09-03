@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { askDeepSeek } from '@/lib/deepseek';
 import { askGLMFoodVision, getGLMVisionModel } from '@/lib/glm-vision';
 import { parseNutritionEstimate, stringifyNutritionEstimate } from '@/lib/nutrition-estimate';
+import { requireAuth } from '@/lib/auth-server';
 
 interface PhotoEstimateBody {
   imageDataUrl?: string;
@@ -11,6 +12,9 @@ interface PhotoEstimateBody {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   try {
     const body = (await request.json()) as PhotoEstimateBody;
     const imageDataUrl = body.imageDataUrl?.trim();

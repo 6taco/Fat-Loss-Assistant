@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { retrieveKnowledge } from '@/lib/rag/retrieval';
 import { rerankChunks } from '@/lib/rag/rerank';
 import type { RagSearchFilters } from '@/lib/rag/types';
+import { requireAuth } from '@/lib/auth-server';
 
 interface SearchBody {
   query?: string;
@@ -10,6 +11,9 @@ interface SearchBody {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   const body = await request.json() as SearchBody;
   const query = body.query?.trim();
   if (!query) return NextResponse.json({ error: 'query is required' }, { status: 400 });

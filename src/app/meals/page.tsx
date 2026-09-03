@@ -106,6 +106,7 @@ export default function MealsPage() {
     }
 
     setIsEstimating(true);
+    let unauthorized = false;
     try {
       const response = await fetch('/api/nutrition-estimate', {
         method: 'POST',
@@ -113,13 +114,14 @@ export default function MealsPage() {
         body: JSON.stringify({ description: text, mealType }),
       });
       const data = (await response.json()) as EstimateResponse;
+      unauthorized = response.status === 401;
       if (!response.ok || !data.estimate) throw new Error(data.error || 'AI 估算失败');
 
       applyEstimate(data.estimate);
       showAppToast('AI 已生成估算，请确认后保存。', 'success');
     } catch {
       setEditMode(true);
-      showAppToast('AI 暂时无法估算，请手动填写营养数据。', 'error');
+      showAppToast(unauthorized ? '请先登录后再使用 AI 估算。' : 'AI 暂时无法估算，请手动填写营养数据。', 'error');
     } finally {
       setIsEstimating(false);
     }
@@ -160,6 +162,7 @@ export default function MealsPage() {
 
     setIsRecognizingPhoto(true);
     setRecognitionStep('正在压缩图片');
+    let unauthorized = false;
     try {
       const imageDataUrl = await fileToCompressedDataUrl(selectedPhoto);
       setRecognitionStep('正在识别食物');
@@ -174,6 +177,7 @@ export default function MealsPage() {
         body: JSON.stringify({ imageDataUrl, mealType }),
       });
       const data = (await response.json()) as EstimateResponse;
+      unauthorized = response.status === 401;
       if (!response.ok || !data.estimate) throw new Error(data.error || '照片估算失败');
 
       applyEstimate(data.estimate);
@@ -188,7 +192,7 @@ export default function MealsPage() {
     } catch {
       setEditMode(true);
       setRecognitionStep('');
-      showAppToast('照片暂时无法估算，请重拍或手动填写。', 'error');
+      showAppToast(unauthorized ? '请先登录后再使用拍照识别。' : '照片暂时无法估算，请重拍或手动填写。', 'error');
     } finally {
       setIsRecognizingPhoto(false);
     }

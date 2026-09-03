@@ -62,10 +62,13 @@ export async function verifyRegistrationCode(emailInput: string, code: string) {
     throw new AuthError('REGISTRATION_CODE_ATTEMPTS_EXCEEDED', 429);
   }
   if (!registrationCodeMatches(code, challenge.codeHash)) {
-    await prisma.registrationChallenge.update({
-      where: { id: challenge.id },
+    // Conditional increment: concurrent wrong guesses can never push the
+    // total past MAX_REGISTRATION_CODE_ATTEMPTS.
+    const bumped = await prisma.registrationChallenge.updateMany({
+      where: { id: challenge.id, attemptCount: { lt: MAX_REGISTRATION_CODE_ATTEMPTS } },
       data: { attemptCount: { increment: 1 } },
     });
+    if (bumped.count === 0) throw new AuthError('REGISTRATION_CODE_ATTEMPTS_EXCEEDED', 429);
     throw new AuthError('INVALID_REGISTRATION_CODE', 400);
   }
 

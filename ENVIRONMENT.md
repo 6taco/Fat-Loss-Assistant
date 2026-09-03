@@ -84,6 +84,8 @@ Authorization: Bearer your_report_cron_secret
 
 Cron 不接受 URL 查询参数传密钥。RAG 导入、索引和 Analytics 管理接口使用同样格式的 `ADMIN_API_KEY` Bearer 请求头。
 
+清理任务：`GET /api/cron/auth-cleanup` 每天北京时间 02:00 运行，删除过期的限流计数（保留 1 天）、过期/已吊销 Session 与注册验证码（保留 7 天）以及已使用/过期的密码重置令牌，防止 auth 相关表无限增长。
+
 ## Vercel 与 Resend
 
 Production 与 Preview 必须分别配置：

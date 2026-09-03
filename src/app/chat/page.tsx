@@ -120,6 +120,11 @@ export default function ChatPage() {
       });
       const data = await response.json();
 
+      if (response.status === 401) {
+        setTyping(false);
+        showAppToast('请先登录后再使用 AI 聊天。', 'error');
+        return;
+      }
       if (!response.ok) throw data;
 
       setTyping(false);

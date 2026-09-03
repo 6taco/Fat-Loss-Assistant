@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { getSessionFromRequest, type AuthContext } from '@/lib/auth/session';
 
 export type AuthResult =
@@ -37,8 +38,19 @@ export function requireCron(request: Request) {
 }
 
 function requireBearerSecret(request: Request, secret: string | undefined, name: string) {
-  if (!secret) return Response.json({ error: `${name} is not configured` }, { status: 503 });
-  if (request.headers.get('authorization') !== `Bearer ${secret}`) {
+  if (!secret) {
+    // Same 401 as a wrong secret: the response must not reveal whether the
+    // instance configured the key at all.
+    console.warn(`[auth] ${name} is not configured; rejecting privileged request`);
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  const header = request.headers.get('authorization') || '';
+  const presented = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : '';
+  // Compare SHA-256 digests: timingSafeEqual needs equal-length buffers, and
+  // digesting first keeps both the content and the length of the secret hidden.
+  const presentedDigest = createHash('sha256').update(presented).digest();
+  const secretDigest = createHash('sha256').update(secret).digest();
+  if (!timingSafeEqual(presentedDigest, secretDigest)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return null;

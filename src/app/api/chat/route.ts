@@ -9,7 +9,7 @@ import { buildIdempotencyKey, ensureUserExists, isToolCallSafe } from '@/lib/mcp
 import { runAgentWorkflow } from '@/lib/agents/orchestrator';
 import type { AgentIntent } from '@/lib/agents/types';
 import type { ChatMessage } from '@/lib/mock-data';
-import { optionalAuth } from '@/lib/auth-server';
+import { requireAuth } from '@/lib/auth-server';
 
 interface ChatRequestBody {
   message?: string;
@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
     if (!message) return NextResponse.json({ error: 'Message is required' }, { status: 400 });
 
     const history = Array.isArray(body.history) ? body.history : [];
-    const auth = await optionalAuth(request);
-    const userId = auth?.userId || undefined;
+    const auth = await requireAuth(request);
+    if (auth.response) return auth.response;
+    const userId = auth.context.userId || undefined;
     const conversationQuestion = buildConversationQuestion(message, history);
 
     const ragResponse = await tryRagAnswer(conversationQuestion, message, body.context, userId);
