@@ -1,7 +1,11 @@
 import { ChatMessage } from '@/lib/mock-data';
+import { llmFetchJson } from '@/lib/llm-fetch';
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+// Report generation with large contexts regularly takes 5-15s; 30s bounds
+// hung upstream connections without failing healthy long generations.
+const DEEPSEEK_TIMEOUT_MS = 30_000;
 
 const COACH_ZERO_SYSTEM_PROMPT = `你是 Coach Zero，一位温柔、稳定、专业的 AI 减脂教练。
 产品场景是“轻燃AI”，用户正在执行由 App 推荐或选择的个性化减脂方案，可能包括碳循环、稳定热量缺口、高蛋白轻断食、训练优先等不同策略。减脂过程可能伴随饥饿、疲惫、焦虑、自责、挫败和想放弃，用户也会来找你寻求安慰。
@@ -73,7 +77,7 @@ export async function askDeepSeek(messages: DeepSeekMessage[]): Promise<string> 
     throw new Error('Missing DEEPSEEK_API_KEY');
   }
 
-  const response = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+  const { ok, status, json } = await llmFetchJson(`${DEEPSEEK_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -86,12 +90,12 @@ export async function askDeepSeek(messages: DeepSeekMessage[]): Promise<string> 
       max_tokens: 900,
       stream: false,
     }),
-  });
+  }, { label: 'DeepSeek', timeoutMs: DEEPSEEK_TIMEOUT_MS });
 
-  const data = (await response.json()) as DeepSeekResponse;
+  const data = json as DeepSeekResponse;
 
-  if (!response.ok) {
-    throw new Error(data.error?.message || `DeepSeek request failed: ${response.status}`);
+  if (!ok) {
+    throw new Error(data.error?.message || `DeepSeek request failed: ${status}`);
   }
 
   const content = data.choices?.[0]?.message?.content?.trim();

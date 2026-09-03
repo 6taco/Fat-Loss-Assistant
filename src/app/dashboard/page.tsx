@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { toPng } from 'html-to-image';
-import jsPDF from 'jspdf';
 import {
   Brain,
   CheckCircle2,
@@ -495,6 +493,9 @@ function WeeklyReportDetail({ report, onBack }: { report: WeeklyReport; onBack: 
   const exportPoster = async () => {
     const node = document.getElementById(printableId);
     if (!node) return;
+    // Loaded on demand: these two libraries are ~450KB and only needed for
+    // the rare weekly-report export.
+    const { toPng } = await import('html-to-image');
     const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
     downloadDataUrl(dataUrl, `fat-loss-weekly-poster-${report.startDate}.png`);
   };
@@ -502,6 +503,7 @@ function WeeklyReportDetail({ report, onBack }: { report: WeeklyReport; onBack: 
   const exportPdf = async () => {
     const node = document.getElementById(printableId);
     if (!node) return;
+    const [{ toPng }, { default: jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
     const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 2 });
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1440] });
     pdf.addImage(dataUrl, 'PNG', 0, 0, 1080, 1440);

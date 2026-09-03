@@ -1,3 +1,5 @@
+import { llmFetchJson } from '@/lib/llm-fetch';
+
 type VisionContent =
   | { type: 'text'; text: string }
   | { type: 'image_url'; image_url: { url: string } };
@@ -20,6 +22,8 @@ interface GLMResponse {
 
 const GLM_BASE_URL = process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/paas/v4';
 const GLM_VISION_MODEL = process.env.GLM_VISION_MODEL || 'glm-4v-plus-0111';
+// Vision inference plus a multi-MB base64 upload is slower than text chat.
+const GLM_VISION_TIMEOUT_MS = 45_000;
 
 const GLM_VISION_SYSTEM_PROMPT = `你是 Fat Loss Assistant 的餐食拍照估算助手。
 请根据图片识别可见食物，并估算每项食物重量、热量、蛋白质、脂肪、碳水。
@@ -84,7 +88,7 @@ export async function askGLMFoodVision(imageDataUrl: string, mealType?: string):
     },
   ];
 
-  const response = await fetch(`${GLM_BASE_URL}/chat/completions`, {
+  const { ok, status, json } = await llmFetchJson(`${GLM_BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -97,11 +101,11 @@ export async function askGLMFoodVision(imageDataUrl: string, mealType?: string):
       max_tokens: 1200,
       stream: false,
     }),
-  });
+  }, { label: 'GLM vision', timeoutMs: GLM_VISION_TIMEOUT_MS });
 
-  const data = (await response.json()) as GLMResponse;
-  if (!response.ok) {
-    throw new Error(data.error?.message || `GLM vision request failed: ${response.status}`);
+  const data = json as GLMResponse;
+  if (!ok) {
+    throw new Error(data.error?.message || `GLM vision request failed: ${status}`);
   }
 
   const content = data.choices?.[0]?.message?.content?.trim();
