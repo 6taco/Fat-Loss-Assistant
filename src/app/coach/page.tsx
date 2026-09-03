@@ -169,7 +169,7 @@ export default function CoachPage() {
         )) : <EmptyCard text="运行一次每日复盘后，这里会出现第一条主动洞察。" />}
       </CoachAccordion>
 
-      <CoachAccordion id="coach-memory" title="记忆与提醒" count={feed.memories.length + feed.notifications.length} icon={Bell}>
+      <CoachAccordion id="coach-memory" title="教练提醒" count={feed.notifications.length} icon={Bell}>
         {feed.notifications.slice(0, 3).map(notification => (
           <GlassCard key={notification.id} className="flex items-start gap-3">
             <Bell size={16} className="mt-0.5 text-accent-blue" />
@@ -179,16 +179,7 @@ export default function CoachPage() {
             </div>
           </GlassCard>
         ))}
-        {feed.memories.slice(0, 3).map(memory => (
-          <GlassCard key={memory.id} className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[13px] font-semibold">{memory.title}</p>
-              <p className="mt-1 text-[11px] text-text-tertiary">记忆类型：{memoryTypeLabel(memory.type)}</p>
-            </div>
-            <ChevronRight size={16} className="mt-0.5 text-text-tertiary" />
-          </GlassCard>
-        ))}
-        {!feed.notifications.length && !feed.memories.length && <EmptyCard text="你采纳或忽略的建议会沉淀为长期记忆，让后续建议更贴合你。" />}
+        {!feed.notifications.length && <EmptyCard text="日报、周报生成后，提醒会出现在这里。" />}
       </CoachAccordion>
     </div>
   );
@@ -385,12 +376,4 @@ function formatDate(date: string) {
 function riskLabel(risk?: string) {
   if (risk === 'medium') return '中';
   return '低';
-}
-
-function memoryTypeLabel(type: string) {
-  if (type === 'effective_strategy') return '有效策略';
-  if (type === 'risk_pattern') return '风险模式';
-  if (type === 'milestone') return '里程碑';
-  if (type === 'rejected_advice') return '已拒绝建议';
-  return '偏好';
 }

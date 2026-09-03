@@ -19,38 +19,6 @@ import { getTodayPlan } from '@/lib/domain';
 
 const quickTags = ['今天吃什么？', '平台期怎么办？', '可以吃欺骗餐吗？', '帮我调整计划', '加餐建议'];
 
-const mockAIResponses: Record<string, { content: string; cards?: ChatCard[] }> = {
-  '今天吃什么？': {
-    content: '今天先按当前碳循环目标安排：主食不过量，蛋白质每餐都要有，蔬菜用来增加饱腹感。',
-    cards: [{
-      type: 'food',
-      title: '今日参考搭配',
-      items: [
-        { label: '早餐：鸡蛋 + 燕麦', value: '约 320 kcal' },
-        { label: '午餐：鸡胸肉 + 米饭 + 蔬菜', value: '约 520 kcal' },
-        { label: '晚餐：鱼肉 + 绿叶菜', value: '约 420 kcal' },
-        { label: '加餐：无糖酸奶或坚果', value: '约 150 kcal' },
-      ],
-    }],
-  },
-  '平台期怎么办？': {
-    content: '体重短期停滞不一定是失败。先看 7-14 天平均体重，再决定是否调整热量或活动量。',
-    cards: [{
-      type: 'suggestion',
-      title: '平台期检查清单',
-      items: [
-        { label: '看平均体重', value: '不要只看单日波动' },
-        { label: '检查睡眠', value: '优先保证 7 小时以上' },
-        { label: '提高日常活动', value: '先增加步数' },
-        { label: '保持蛋白质', value: '每公斤体重约 1.5g' },
-      ],
-    }],
-  },
-  default: {
-    content: '我听到了，减脂有时候真的会让人很累。今天先别急着把所有事都做好，先完成一个很小的动作：喝点水，吃一份蛋白质，或者出门走 5 分钟。你不是失败，我们先把这一刻稳住。',
-  },
-};
-
 export default function ChatPage() {
   const router = useRouter();
   const { messages, isTyping, loadMessages, addMessage, setTyping } = useChatStore();
@@ -136,21 +104,21 @@ export default function ChatPage() {
       });
       addMessage(data.message as ChatMessage);
     } catch (error) {
+      // Server-provided fallback text stays; the old canned "local fallback"
+      // replies pretended to answer the question and misled users.
       const fallback = error && typeof error === 'object' && 'fallback' in error
         ? (error as { fallback: ChatMessage }).fallback
         : null;
       const respondedAt = new Date();
-      const resp = mockAIResponses[text.trim()] || mockAIResponses.default;
       const aiMsg: ChatMessage = fallback || {
         id: `msg-${respondedAt.getTime()}`,
         role: 'ai',
-        content: resp.content,
+        content: 'AI 服务暂时没有连上，上面这条不是 AI 的回复。你的消息没有丢失，稍后再试一次，或先去「教练」页看看今日建议。',
         timestamp: respondedAt.toISOString(),
-        cards: resp.cards,
       };
 
       setTyping(false);
-      showAppToast('AI 服务暂时不可用，已使用本地降级建议。', 'error');
+      showAppToast('AI 服务暂时不可用，请稍后重试。', 'error');
       addMessage(aiMsg);
     }
   };

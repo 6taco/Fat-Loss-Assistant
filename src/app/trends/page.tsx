@@ -12,7 +12,6 @@ import { useWeightPredictionStore } from '@/stores/useWeightPredictionStore';
 import { useWeightStore } from '@/stores/useWeightStore';
 import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
 import { sumMealMacros } from '@/lib/domain';
-import { mockUser } from '@/lib/mocks';
 
 type RangeKey = '7' | '30' | '90' | 'all';
 type MacroDay = Pick<DayPlan, 'date' | 'calories' | 'carb' | 'protein' | 'fat'>;
@@ -46,7 +45,7 @@ export default function TrendsPage() {
     loadPredictions,
     generatePrediction,
   } = useWeightPredictionStore();
-  const u = user || mockUser;
+  const u = user;
 
   useEffect(() => {
     loadUser();
@@ -57,7 +56,7 @@ export default function TrendsPage() {
   }, [loadUser, loadEntries, loadPlans, loadMeals, loadPredictions]);
 
   const selectedRange = timeRanges.find(item => item.key === range) || timeRanges[0];
-  const mergedWeightEntries = useMemo(() => mergeInitialWeight(u, weightEntries), [u, weightEntries]);
+  const mergedWeightEntries = useMemo(() => u ? mergeInitialWeight(u, weightEntries) : weightEntries, [u, weightEntries]);
   const chartData = useMemo(() => {
     return filterWeightsByRange(mergedWeightEntries, selectedRange.days);
   }, [mergedWeightEntries, selectedRange.days]);
@@ -70,6 +69,19 @@ export default function TrendsPage() {
     return plans.slice(0, Math.min(limit, plans.length));
   }, [actualMacroDays, plans, selectedRange.days]);
   const hasActualMacroData = actualMacroDays.length > 0;
+
+  // Never render analysis computed from demo data — without a profile the
+  // goal line and "current weight" would silently be mockUser's numbers.
+  if (!u) {
+    return (
+      <div className="px-5 pt-14 pb-28 min-h-dvh flex flex-col items-center justify-center text-center">
+        <p className="text-[15px] font-semibold mb-1">资料还没有准备好</p>
+        <p className="text-[12px] text-text-tertiary leading-relaxed max-w-[260px]">
+          趋势、目标线和预测需要你的个人资料。请先完成或重新填写资料。
+        </p>
+      </div>
+    );
+  }
 
   const latestWeight = chartData[chartData.length - 1];
   const firstWeight = chartData[0];
@@ -529,10 +541,18 @@ function getAverageMacros(days: MacroDay[]) {
 }
 
 function getCurrentStreak(plans: DayPlan[]): number {
+  // Current streak: consecutive completed days ending today (or yesterday —
+  // today doesn't break the streak while it is still in progress).
+  const completedByDate = new Map(plans.map(plan => [plan.date, plan.completed]));
+  const cursor = new Date();
+  if (!completedByDate.get(cursor.toISOString().slice(0, 10))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
   let streak = 0;
-  for (const plan of plans) {
-    if (!plan.completed) break;
+  for (;;) {
+    if (!completedByDate.get(cursor.toISOString().slice(0, 10))) break;
     streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
 }

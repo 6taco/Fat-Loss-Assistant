@@ -7,18 +7,20 @@ import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Button from '@/components/ui/Button';
 import { usePlanStore } from '@/stores/usePlanStore';
+import { useMealStore } from '@/stores/useMealStore';
 import { DayPlan } from '@/lib/types';
-import { carbColors } from '@/lib/domain';
+import { carbColors, sumMealMacros } from '@/lib/domain';
 
 export default function CalendarPage() {
   const { plans, loadPlans, toggleComplete } = usePlanStore();
+  const { meals, loadMeals } = useMealStore();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
-  useEffect(() => { loadPlans(); }, [loadPlans]);
+  useEffect(() => { loadPlans(); loadMeals(); }, [loadPlans, loadMeals]);
 
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
@@ -31,6 +33,8 @@ export default function CalendarPage() {
 
   const selectedPlan = selectedDate ? planMap.get(selectedDate) : null;
   const cc = selectedPlan ? carbColors[selectedPlan.carbType] : null;
+  const dayMeals = selectedDate ? meals.filter(meal => meal.date === selectedDate) : [];
+  const actualMacros = dayMeals.length ? sumMealMacros(dayMeals) : null;
 
   const prevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
@@ -149,22 +153,28 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* Macro bars */}
-              <div className="flex flex-col gap-3 mb-5">
-                {[
-                  { label: '碳水', current: Math.round(selectedPlan.carb * 0.72), target: selectedPlan.carb, color: cc.main },
-                  { label: '蛋白质', current: Math.round(selectedPlan.protein * 0.75), target: selectedPlan.protein, color: '#0A84FF' },
-                  { label: '脂肪', current: Math.round(selectedPlan.fat * 0.67), target: selectedPlan.fat, color: '#FFD60A' },
-                ].map(m => (
-                  <div key={m.label}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[12px] text-text-secondary">{m.label}</span>
-                      <span className="text-[12px] font-medium">{m.current} / {m.target}g</span>
+              {/* Macro bars — actual intake from logged meals for this day */}
+              {actualMacros ? (
+                <div className="flex flex-col gap-3 mb-5">
+                  {[
+                    { label: '碳水', current: Math.round(actualMacros.carb), target: selectedPlan.carb, color: cc.main },
+                    { label: '蛋白质', current: Math.round(actualMacros.protein), target: selectedPlan.protein, color: '#0A84FF' },
+                    { label: '脂肪', current: Math.round(actualMacros.fat), target: selectedPlan.fat, color: '#FFD60A' },
+                  ].map(m => (
+                    <div key={m.label}>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-[12px] text-text-secondary">{m.label}</span>
+                        <span className="text-[12px] font-medium">{m.current} / {m.target}g</span>
+                      </div>
+                      <ProgressBar value={Math.min(100, (m.current / m.target) * 100)} color={m.color} />
                     </div>
-                    <ProgressBar value={(m.current / m.target) * 100} color={m.color} />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mb-5 rounded-xl bg-white/[0.06] px-3 py-2.5 text-[12px] text-text-tertiary">
+                  当天暂无饮食记录。去「饮食」页记录后，这里会显示实际摄入进度。
+                </p>
+              )}
 
               {/* Recommended foods */}
               <p className="text-[12px] text-text-secondary font-medium mb-2">推荐食物</p>

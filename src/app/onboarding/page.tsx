@@ -10,6 +10,8 @@ import { showAppToast } from '@/components/ui/ToastHost';
 import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { type MuscleGroup, type TrainingDay, type UserProfile } from '@/lib/types';
+import { getScopedKey } from '@/lib/accounts';
+import { getItem, KEYS } from '@/lib/storage';
 import { buildTrainingCycleByFrequency, appendTrainingCycleDay, generateCarbCyclePlan, muscleGroupLabels, normalizeTrainingCycle, removeLastTrainingCycleDay, updateTrainingCycleDay } from '@/lib/domain';
 import { generateStrategyDayPlans, recommendFatLossStrategy } from '@/lib/strategy-engine/engine';
 import { usePlanStore } from '@/stores/usePlanStore';
@@ -74,6 +76,42 @@ const initialForm: FormState = {
   trainingSchedule: buildTrainingCycleByFrequency(3),
 };
 
+// Server lifestyle profile shape for the fields the questionnaire asks about;
+// numeric answers are stored as numbers there but strings in the form.
+type StoredLifestyle = Partial<Omit<FormState, 'averageSleepHours' | 'targetWeeks'>>
+  & { averageSleepHours?: number; targetWeeks?: number };
+
+function prefillFormFromProfile(base: FormState, user: UserProfile, lifestyle: StoredLifestyle | null): FormState {
+  return {
+    ...base,
+    gender: user.gender,
+    age: String(user.age),
+    height: String(user.height),
+    weight: String(user.weight),
+    bodyFat: String(user.bodyFat),
+    weightMeasuredDate: today(),
+    goalWeight: String(user.goalWeight),
+    trainingFrequency: user.trainingFrequency,
+    trainingIntensity: user.trainingIntensity,
+    trainingSchedule: normalizeTrainingCycle(user.trainingSchedule),
+    ...(lifestyle ? {
+      fatLossGoal: lifestyle.fatLossGoal ?? base.fatLossGoal,
+      sleepRegularity: lifestyle.sleepRegularity ?? base.sleepRegularity,
+      averageSleepHours: lifestyle.averageSleepHours !== undefined ? String(lifestyle.averageSleepHours) : base.averageSleepHours,
+      workStudyRhythm: lifestyle.workStudyRhythm ?? base.workStudyRhythm,
+      oftenStaysUpLate: lifestyle.oftenStaysUpLate ?? base.oftenStaysUpLate,
+      dietRegularity: lifestyle.dietRegularity ?? base.dietRegularity,
+      bingeRisk: lifestyle.bingeRisk ?? base.bingeRisk,
+      takeawayFrequency: lifestyle.takeawayFrequency ?? base.takeawayFrequency,
+      complexPlanTolerance: lifestyle.complexPlanTolerance ?? base.complexPlanTolerance,
+      hasFitnessHabit: lifestyle.hasFitnessHabit ?? base.hasFitnessHabit,
+      hasStrengthTraining: lifestyle.hasStrengthTraining ?? base.hasStrengthTraining,
+      trainingExperience: lifestyle.trainingExperience ?? base.trainingExperience,
+      targetWeeks: lifestyle.targetWeeks !== undefined ? String(lifestyle.targetWeeks) : base.targetWeeks,
+    } : {}),
+  };
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const auth = useAuth();
@@ -85,6 +123,7 @@ export default function OnboardingPage() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [recommendation, setRecommendation] = useState<StrategyRecommendation | null>(null);
   const [selectedStrategy, setSelectedStrategy] = useState<FatLossStrategyType | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     if (auth.status === 'anonymous') {
@@ -92,8 +131,26 @@ export default function OnboardingPage() {
       return;
     }
     if (auth.status !== 'authenticated') return;
+    // ?edit=1 re-runs the questionnaire for existing users (the dashboard
+    // "重新填写信息" entry); without it, profile-bearing users are sent back.
+    const isEdit = new URLSearchParams(window.location.search).get('edit') === '1';
     if (auth.user.hasProfile) {
-      router.replace('/dashboard');
+      if (!isEdit) {
+        router.replace('/dashboard');
+        return;
+      }
+      const existing = useUserStore.getState().user
+        || getItem<UserProfile | null>(getScopedKey(KEYS.USER), null);
+      if (existing) {
+        const storedLifestyle = getItem<StoredLifestyle | null>(getScopedKey(KEYS.LIFESTYLE_PROFILE), null);
+        // Deferred like AuthProvider's refresh: synchronous setState in an
+        // effect cascades renders.
+        const timer = window.setTimeout(() => {
+          setForm(base => prefillFormFromProfile(base, existing, storedLifestyle));
+          setEditMode(true);
+        }, 0);
+        return () => window.clearTimeout(timer);
+      }
       return;
     }
     identifyAnalyticsUser(auth.user.id);
@@ -232,7 +289,7 @@ export default function OnboardingPage() {
 
   const back = () => {
     if (step > 1) setStep(step - 1);
-    else router.push('/');
+    else router.push(editMode ? '/dashboard' : '/');
   };
 
   return (

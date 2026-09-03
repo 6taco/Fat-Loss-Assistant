@@ -33,7 +33,6 @@ import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
 import { type CarbType, type DailyReport, type UserProfile, type WeightEntry, type WeeklyReport } from '@/lib/types';
 import { carbColors, getFatBurnIndex, getTodayPlan } from '@/lib/domain';
-import { mockUser } from '@/lib/mocks';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -90,15 +89,15 @@ export default function DashboardPage() {
     return () => window.clearTimeout(timeoutId);
   }, [justCompleted]);
 
-  const profile = user || mockUser;
+  const profile = user;
   const todayPlan = getTodayPlan(plans);
   const color = todayPlan ? carbColors[todayPlan.carbType] : carbColors.low;
   const burnIndex = todayPlan ? getFatBurnIndex(todayPlan.carbType, todayPlan.completed) : 0;
   const mealSummary = getDailySummary(todayIso);
-  const weights = useMemo(() => mergeInitialWeight(profile, weightEntries), [profile, weightEntries]);
+  const weights = useMemo(() => profile ? mergeInitialWeight(profile, weightEntries) : weightEntries, [profile, weightEntries]);
   const chartEntries = weights.slice(-7);
   const latestWeight = chartEntries[chartEntries.length - 1];
-  const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(profile.startDate).getTime()) / 86400000) + 1);
+  const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(profile?.startDate || todayIso).getTime()) / 86400000) + 1);
   const hasUnreadReports = dailyReports.some(report => !report.readAt) || weeklyReports.some(report => !report.readAt);
 
   const saveWeight = () => {
@@ -113,6 +112,29 @@ export default function DashboardPage() {
     setWeightValue('');
     showAppToast('体重已保存。', 'success');
   };
+
+  // Honest state while the profile is unavailable: never render demo data.
+  // The effect above routes profile-less users to onboarding; this covers the
+  // brief load window and cleared-local-data edge cases.
+  if (!profile) {
+    return (
+      <div className="px-5 pt-14 pb-28 min-h-dvh flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-2xl glass-card flex items-center justify-center mb-4">
+          <Scale size={20} className="text-accent-blue" />
+        </div>
+        <p className="text-[15px] font-semibold mb-1">正在加载你的资料</p>
+        <p className="text-[12px] text-text-tertiary leading-relaxed max-w-[260px]">
+          首次加载需要一点时间。长时间没有反应的话，请检查网络后刷新，或重新填写资料。
+        </p>
+        <button
+          onClick={() => router.push('/onboarding?edit=1')}
+          className="mt-5 py-2.5 px-6 rounded-xl gradient-accent text-white text-[13px] font-medium cursor-pointer border-none"
+        >
+          重新填写资料
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="px-5 pt-14 pb-28 min-h-dvh relative overflow-hidden">
@@ -311,7 +333,7 @@ export default function DashboardPage() {
             >
               导出 JSON
             </button>
-            <button onClick={() => router.push('/onboarding')} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer">
+            <button onClick={() => router.push('/onboarding?edit=1')} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer">
               重新填写信息
             </button>
             <button
