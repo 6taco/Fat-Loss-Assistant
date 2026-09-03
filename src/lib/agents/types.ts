@@ -1,4 +1,5 @@
 import type { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry, WeeklyReport, WeightPredictionResult } from '@/lib/types';
+import type { UserLifestyleProfile } from '@/lib/strategy-engine/types';
 import type { ToolCallDraft, ToolName } from '@/lib/mcp/types';
 
 export type AgentName = 'nutrition' | 'training' | 'recovery' | 'strategy' | 'coach';
@@ -12,6 +13,7 @@ export interface AgentContext {
   plans: DayPlan[];
   meals: MealLog[];
   weights: WeightEntry[];
+  lifestyle?: UserLifestyleProfile;
   reports: {
     daily?: DailyReport;
     weekly?: WeeklyReport;

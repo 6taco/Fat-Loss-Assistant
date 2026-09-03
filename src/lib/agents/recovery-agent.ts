@@ -38,6 +38,31 @@ export async function runRecoveryAgent(context: AgentContext): Promise<AgentResu
     });
   }
 
+  // Sleep habits come from the onboarding lifestyle profile the user filled
+  // in — irregular sleep or frequent late nights slow recovery and blunt fat
+  // loss regardless of training volume.
+  const sleepIrregular = context.lifestyle?.sleepRegularity === 'irregular';
+  if (sleepIrregular || context.lifestyle?.oftenStaysUpLate) {
+    findings.push({
+      id: 'recovery-sleep-habits',
+      agent: 'recovery',
+      type: 'recovery',
+      severity: 'warning',
+      title: '睡眠习惯可能拖慢恢复',
+      summary: sleepIrregular
+        ? '你反馈过睡眠时间不规律。睡眠不稳会影响食欲激素和水分平衡，先固定入睡时间比加训练更有价值。'
+        : '你反馈过经常熬夜。尽量把入睡时间提前 30-60 分钟，对恢复和体重趋势都有帮助。',
+      evidence: {
+        sleepRegularity: context.lifestyle?.sleepRegularity,
+        averageSleepHours: context.lifestyle?.averageSleepHours,
+        oftenStaysUpLate: context.lifestyle?.oftenStaysUpLate,
+        source: 'lifestyle_profile',
+      },
+      confidence: 'medium',
+      recommendedActions: [],
+    });
+  }
+
   if (!findings.length) {
     findings.push({
       id: 'recovery-limited-data',
@@ -45,9 +70,11 @@ export async function runRecoveryAgent(context: AgentContext): Promise<AgentResu
       type: 'recovery',
       severity: 'info',
       title: '恢复数据仍然有限',
-      summary: '当前缺少睡眠和疲劳记录，恢复判断以训练密度和体重波动为参考。',
-      evidence: { recoveryDataCompleteness: 0.35, trainingDays, restDays, weightSwing },
-      confidence: 'low',
+      summary: context.lifestyle
+        ? '已结合你问卷中的睡眠与作息信息。当前恢复判断以训练密度、体重波动和作息习惯为参考。'
+        : '当前缺少睡眠和疲劳记录，恢复判断以训练密度和体重波动为参考。',
+      evidence: { recoveryDataCompleteness: context.lifestyle ? 0.5 : 0.35, trainingDays, restDays, weightSwing },
+      confidence: context.lifestyle ? 'medium' : 'low',
       recommendedActions: [],
     });
   }

@@ -44,15 +44,34 @@ export async function runNutritionAgent(context: AgentContext): Promise<AgentRes
   }
 
   if (calorieRate !== undefined && calorieRate > 1.2) {
+    // High binge risk changes the guidance: over-restricting the next day is
+    // the classic binge-restrict loop this user told us about.
+    const bingeAware = context.lifestyle?.bingeRisk === 'high';
     findings.push({
       id: 'nutrition-high-calorie',
       agent: 'nutrition',
       type: 'adherence',
       severity: 'action',
       title: '今天热量明显偏高',
-      summary: `今天热量约 ${Math.round(calories)} kcal，已经超过目标 20%，明天正常拉回节奏即可。`,
-      evidence: { calories, target: todayPlan?.calories, calorieRate },
+      summary: bingeAware
+        ? `今天热量约 ${Math.round(calories)} kcal，超过目标 20%。你此前反馈暴食风险较高，明天不建议大幅少吃"拉回"，按原目标正常执行即可。`
+        : `今天热量约 ${Math.round(calories)} kcal，已经超过目标 20%，明天正常拉回节奏即可。`,
+      evidence: { calories, target: todayPlan?.calories, calorieRate, bingeRisk: context.lifestyle?.bingeRisk },
       confidence: 'high',
+      recommendedActions: [],
+    });
+  }
+
+  if (context.lifestyle?.dietRegularity === 'irregular') {
+    findings.push({
+      id: 'nutrition-irregular-meal-timing',
+      agent: 'nutrition',
+      type: 'nutrition',
+      severity: 'info',
+      title: '饮食节奏不规律',
+      summary: '你在问卷里反馈饮食时间不太规律。固定 2-3 个用餐时间点、避免长时间空腹后暴吃，比压低热量更容易坚持。',
+      evidence: { dietRegularity: context.lifestyle.dietRegularity, source: 'lifestyle_profile' },
+      confidence: 'medium',
       recommendedActions: [],
     });
   }

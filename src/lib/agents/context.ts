@@ -1,5 +1,6 @@
 import { getShanghaiDate } from '@/lib/daily-report';
 import { getPrisma } from '@/lib/prisma';
+import { lifestyleToResponse } from '@/lib/strategy-engine/mappers';
 import {
   dailyReportToResponse,
   dateToISODate,
@@ -21,7 +22,7 @@ export async function buildAgentContext(userId: string, options: { date?: string
   const from = addDays(date, -lookbackDays);
   const to = addDays(date, forwardDays);
 
-  const [user, plans, meals, weights, dailyReport, weeklyReport, memories, coachMemories] = await Promise.all([
+  const [user, plans, meals, weights, dailyReport, weeklyReport, memories, coachMemories, lifestyleProfile] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId } }),
     prisma.dayPlan.findMany({ where: { userId, date: { gte: toDate(from), lte: toDate(to) } }, orderBy: { date: 'asc' } }),
     prisma.mealLog.findMany({ where: { userId, date: { gte: toDate(from), lte: toDate(date) } }, orderBy: [{ date: 'asc' }, { createdAt: 'asc' }] }),
@@ -30,6 +31,7 @@ export async function buildAgentContext(userId: string, options: { date?: string
     prisma.weeklyReport.findFirst({ where: { userId }, orderBy: { createdAt: 'desc' } }),
     prisma.agentMemory.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' }, take: 12 }).catch(() => []),
     prisma.coachMemory.findMany({ where: { userId }, orderBy: { updatedAt: 'desc' }, take: 8 }),
+    prisma.userLifestyleProfile.findUnique({ where: { userId } }),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -47,6 +49,7 @@ export async function buildAgentContext(userId: string, options: { date?: string
     plans: plans.map(dayPlanToResponse),
     meals: meals.map(mealLogToResponse),
     weights: weights.map(weightToResponse),
+    lifestyle: lifestyleProfile ? lifestyleToResponse(lifestyleProfile) : undefined,
     reports: {
       daily: dailyReport ? dailyReportToResponse(dailyReport) : undefined,
       weekly: weeklyReport ? weeklyReportToResponse(weeklyReport) : undefined,

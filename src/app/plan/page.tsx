@@ -1,21 +1,119 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Flame, Gauge, Sparkles } from 'lucide-react';
+import { Clock, Dumbbell, Flame, Gauge, ShoppingBasket, Sparkles, Utensils } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
+import { showAppToast } from '@/components/ui/ToastHost';
 import { carbColors, getPlanWeek } from '@/lib/domain';
+import { getScopedKey } from '@/lib/accounts';
+import { getItem, setItem, KEYS } from '@/lib/storage';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useStrategyStore } from '@/stores/useStrategyStore';
+
+interface GeneratedMeal {
+  mealType: string;
+  label: string;
+  calories: number;
+  carb: number;
+  protein: number;
+  fat: number;
+  foods: string[];
+}
+
+interface MealPlanResult {
+  id: string;
+  date: string;
+  meals: GeneratedMeal[];
+}
+
+interface TrainingDayResult {
+  date: string;
+  muscleGroup: string;
+  label: string;
+  intensity: string;
+  blocks: string[];
+}
+
+interface TrainingPlanResult {
+  id: string;
+  startDate: string;
+  endDate: string;
+  days: TrainingDayResult[];
+}
+
+interface ShoppingItemResult {
+  name: string;
+  category: string;
+  count: number;
+  amountText: string;
+}
+
+interface ShoppingListResult {
+  id: string;
+  startDate: string;
+  endDate: string;
+  items: ShoppingItemResult[];
+}
+
+const todayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function PlanPage() {
   const { plans, loadPlans } = usePlanStore();
   const { currentStrategy, recommendation, executionRate, loadCurrent } = useStrategyStore();
+  const [mealPlans, setMealPlans] = useState<MealPlanResult[]>([]);
+  const [trainingPlan, setTrainingPlan] = useState<TrainingPlanResult | null>(null);
+  const [shoppingList, setShoppingList] = useState<ShoppingListResult | null>(null);
+  const [generating, setGenerating] = useState<'meals' | 'training' | 'shopping' | null>(null);
 
   useEffect(() => {
     loadPlans();
     loadCurrent();
+    // Deferred like AuthProvider's refresh: synchronous setState in an
+    // effect cascades renders.
+    const timer = window.setTimeout(() => {
+      setMealPlans(getItem<MealPlanResult[]>(getScopedKey(KEYS.MEAL_PLAN_TOOL), []));
+      setTrainingPlan(getItem<TrainingPlanResult | null>(getScopedKey(KEYS.TRAINING_PLAN_TOOL), null));
+      setShoppingList(getItem<ShoppingListResult | null>(getScopedKey(KEYS.SHOPPING_LIST_TOOL), null));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadPlans, loadCurrent]);
+
+  const generate = async (kind: 'meals' | 'training' | 'shopping') => {
+    setGenerating(kind);
+    try {
+      const endpoint = kind === 'meals' ? '/api/meal-plans/generate' : kind === 'training' ? '/api/training-plans/generate' : '/api/shopping-lists/generate';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate: todayIso() }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '生成失败');
+
+      if (kind === 'meals' && Array.isArray(data.mealPlans)) {
+        setMealPlans(data.mealPlans);
+        setItem(getScopedKey(KEYS.MEAL_PLAN_TOOL), data.mealPlans);
+        showAppToast('3 天餐单已生成。', 'success');
+      } else if (kind === 'training' && data.trainingPlan) {
+        setTrainingPlan(data.trainingPlan);
+        setItem(getScopedKey(KEYS.TRAINING_PLAN_TOOL), data.trainingPlan);
+        showAppToast('7 天训练安排已生成。', 'success');
+      } else if (kind === 'shopping' && data.shoppingList) {
+        setShoppingList(data.shoppingList);
+        setItem(getScopedKey(KEYS.SHOPPING_LIST_TOOL), data.shoppingList);
+        showAppToast('采购清单已生成。', 'success');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '生成失败';
+      const hint = message.includes('没有可用于生成')
+        ? '当前日期范围内还没有每日计划，请先在首页完成打卡或重新生成策略计划。'
+        : message;
+      showAppToast(hint, 'error');
+    } finally {
+      setGenerating(null);
+    }
+  };
 
   const strategyType = currentStrategy?.strategyType || recommendation?.strategyType || plans[0]?.strategyType || 'carb_cycling';
   const { plans: weekPlans, weekNumber, startIndex } = getPlanWeek(plans);
@@ -79,7 +177,7 @@ export default function PlanPage() {
       )}
 
       <p className="text-[13px] text-text-secondary font-medium mb-3">第 {weekNumber} 周 · 每日目标</p>
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2.5 mb-8">
         {weekPlans.map((plan, index) => {
           const color = carbColors[plan.carbType];
           const isCarbCycle = strategyType === 'carb_cycling';
@@ -109,7 +207,126 @@ export default function PlanPage() {
           );
         })}
       </div>
+
+      <p className="text-[13px] text-text-secondary font-medium mb-3">AI 计划工具</p>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <ToolButton
+          icon={Utensils}
+          label="生成餐单"
+          hint="未来 3 天"
+          loading={generating === 'meals'}
+          onClick={() => void generate('meals')}
+        />
+        <ToolButton
+          icon={Dumbbell}
+          label="训练安排"
+          hint="未来 7 天"
+          loading={generating === 'training'}
+          onClick={() => void generate('training')}
+        />
+        <ToolButton
+          icon={ShoppingBasket}
+          label="采购清单"
+          hint="未来 3 天"
+          loading={generating === 'shopping'}
+          onClick={() => void generate('shopping')}
+        />
+      </div>
+
+      {mealPlans.length > 0 && (
+        <GlassCard className="mb-4" padding="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-semibold">餐单 · {mealPlans[0]?.date} 起 {mealPlans.length} 天</p>
+            <span className="text-[10px] text-text-tertiary">AI 规则生成 · 可重新生成</span>
+          </div>
+          <div className="flex flex-col gap-3">
+            {mealPlans.map(plan => (
+              <div key={plan.id} className="rounded-xl bg-white/[0.045] border border-white/10 p-3">
+                <p className="text-[12px] font-semibold mb-2">{plan.date}</p>
+                <div className="flex flex-col gap-1.5">
+                  {plan.meals?.map(meal => (
+                    <div key={meal.mealType} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium">{meal.label}</p>
+                        <p className="text-[11px] text-text-tertiary leading-snug">{meal.foods?.join(' · ')}</p>
+                      </div>
+                      <span className="text-[11px] text-text-secondary shrink-0">{meal.calories} kcal</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
+      {trainingPlan && (
+        <GlassCard className="mb-4" padding="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-semibold">训练安排 · {trainingPlan.startDate} ~ {trainingPlan.endDate}</p>
+            <span className="text-[10px] text-text-tertiary">AI 规则生成 · 可重新生成</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {trainingPlan.days?.map(day => (
+              <div key={day.date} className="flex items-start gap-3 rounded-xl bg-white/[0.045] border border-white/10 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium">
+                    {day.date} · {day.label}
+                    <span className="text-text-tertiary font-normal"> · {day.intensity}</span>
+                  </p>
+                  <p className="text-[11px] text-text-tertiary leading-snug mt-0.5">{day.blocks?.join(' → ')}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassCard>
+      )}
+
+      {shoppingList && (
+        <GlassCard className="mb-4" padding="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[13px] font-semibold">采购清单 · {shoppingList.startDate} ~ {shoppingList.endDate}</p>
+            <span className="text-[10px] text-text-tertiary">按餐单汇总</span>
+          </div>
+          {(['蛋白质', '碳水', '脂肪'] as const).map(category => {
+            const items = shoppingList.items?.filter(item => item.category === category) || [];
+            if (!items.length) return null;
+            return (
+              <div key={category} className="mb-3 last:mb-0">
+                <p className="text-[11px] text-text-tertiary font-medium mb-1.5">{category}</p>
+                <div className="flex gap-2 flex-wrap">
+                  {items.map(item => (
+                    <span key={item.name} className="glass-card rounded-full px-3 py-1.5 text-[12px]">
+                      {item.name}<span className="text-text-tertiary"> · {item.amountText}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </GlassCard>
+      )}
     </div>
+  );
+}
+
+function ToolButton({ icon: Icon, label, hint, loading, onClick }: {
+  icon: typeof Flame;
+  label: string;
+  hint: string;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="rounded-xl border border-border-glass bg-white/[0.045] px-2 py-3 flex flex-col items-center gap-1 cursor-pointer disabled:opacity-60 active:scale-[0.98] transition-transform"
+    >
+      <Icon size={18} className={loading ? 'animate-pulse text-accent-blue' : 'text-accent-blue'} />
+      <span className="text-[12px] font-medium">{loading ? '生成中…' : label}</span>
+      <span className="text-[10px] text-text-tertiary">{hint}</span>
+    </button>
   );
 }
 

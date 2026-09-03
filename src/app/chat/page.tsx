@@ -16,8 +16,29 @@ import { COACH_PROFILES, useCoachPreferenceStore } from '@/stores/useCoachPrefer
 import type { CoachProfile } from '@/stores/useCoachPreferenceStore';
 import { ChatCard, ChatMessage, DailyReport } from '@/lib/types';
 import { getTodayPlan } from '@/lib/domain';
+import { getScopedKey } from '@/lib/accounts';
+import { getItem, KEYS } from '@/lib/storage';
 
 const quickTags = ['今天吃什么？', '平台期怎么办？', '可以吃欺骗餐吗？', '帮我调整计划', '加餐建议'];
+
+// Onboarding lifestyle answers the user already gave — the coach should know
+// about binge risk, sleep habits and plan tolerance when replying.
+function getLifestyleContext() {
+  const stored = getItem<Record<string, unknown> | null>(getScopedKey(KEYS.LIFESTYLE_PROFILE), null);
+  if (!stored) return undefined;
+  return {
+    sleepRegularity: stored.sleepRegularity,
+    averageSleepHours: stored.averageSleepHours,
+    oftenStaysUpLate: stored.oftenStaysUpLate,
+    dietRegularity: stored.dietRegularity,
+    bingeRisk: stored.bingeRisk,
+    takeawayFrequency: stored.takeawayFrequency,
+    complexPlanTolerance: stored.complexPlanTolerance,
+    trainingExperience: stored.trainingExperience,
+    fatLossGoal: stored.fatLossGoal,
+    targetWeeks: stored.targetWeeks,
+  };
+}
 
 export default function ChatPage() {
   const router = useRouter();
@@ -84,6 +105,7 @@ export default function ChatPage() {
             todayPlan,
             recentWeights: weightEntries.slice(-5),
             completed: todayPlan?.completed,
+            lifestyle: getLifestyleContext(),
           },
         }),
       });

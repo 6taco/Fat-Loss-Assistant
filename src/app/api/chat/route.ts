@@ -20,6 +20,18 @@ interface ChatRequestBody {
     todayPlan?: unknown;
     recentWeights?: unknown[];
     completed?: boolean;
+    lifestyle?: {
+      sleepRegularity?: string;
+      averageSleepHours?: number;
+      oftenStaysUpLate?: boolean;
+      dietRegularity?: string;
+      bingeRisk?: string;
+      takeawayFrequency?: string;
+      complexPlanTolerance?: string;
+      trainingExperience?: string;
+      fatLossGoal?: string;
+      targetWeeks?: number;
+    };
   };
 }
 
