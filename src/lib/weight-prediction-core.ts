@@ -1,13 +1,5 @@
-import {
-  calculateMealCalories,
-  type CalorieDeficitSummary,
-  type DayPlan,
-  type MealLog,
-  type PlateauDetection,
-  type WeightEntry,
-  type WeightPredictionPoint,
-  type WeightPredictionResult,
-} from '@/lib/mock-data';
+import { type CalorieDeficitSummary, type DayPlan, type MealLog, type PlateauDetection, type WeightEntry, type WeightPredictionPoint, type WeightPredictionResult } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 
 export interface WeightPredictionInput {
   userId: string;

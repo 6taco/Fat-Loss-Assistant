@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { getJson } from '@/lib/client-api';
-import { calculateMealCalories, DailyReport, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
+import { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 

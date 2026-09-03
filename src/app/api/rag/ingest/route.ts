@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ingestKnowledgeSource } from '@/lib/rag/ingest';
 import type { RagSourceInput } from '@/lib/rag/types';
 import { requireAdmin } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function POST(request: NextRequest) {
   const authResponse = requireAdmin(request);
@@ -26,10 +27,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ...result, source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), source: 'local' }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, '知识库导入暂时失败'), source: 'local' }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '知识库导入暂时失败';
-}

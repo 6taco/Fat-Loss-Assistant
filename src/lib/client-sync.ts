@@ -1,5 +1,5 @@
 import { sendJson } from '@/lib/client-api';
-import type { DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
+import type { DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/types';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS } from '@/lib/storage';
 

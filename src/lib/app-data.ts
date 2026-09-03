@@ -1,5 +1,5 @@
 import { KEYS, getItem, removeItem } from '@/lib/storage';
-import { ChatMessage, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
+import { ChatMessage, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/types';
 import { getAccounts, getAccountScopedKey, getActiveAccount, getScopedKey } from '@/lib/accounts';
 
 export interface LocalAppData {

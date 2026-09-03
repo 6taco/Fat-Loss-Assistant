@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runDailyCoach } from '@/lib/coach';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface RunDailyBody {
   userId?: string;
@@ -21,11 +22,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       feed: { insights: [], proposals: [], notifications: [], memories: [] },
       source: 'db',
-      warning: getErrorMessage(error),
+      warning: getRouteErrorMessage(error, '每日教练分析暂时无法写入数据库'),
     }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '每日教练分析暂时无法写入数据库';
-}

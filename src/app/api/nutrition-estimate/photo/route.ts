@@ -3,6 +3,7 @@ import { askDeepSeek } from '@/lib/deepseek';
 import { askGLMFoodVision, getGLMVisionModel } from '@/lib/glm-vision';
 import { parseNutritionEstimate, stringifyNutritionEstimate } from '@/lib/nutrition-estimate';
 import { requireAuth } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface PhotoEstimateBody {
   imageDataUrl?: string;
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), source: 'manual' }, { status: 502 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Photo nutrition estimate failed'), source: 'manual' }, { status: 502 });
   }
 }
 
@@ -82,6 +83,3 @@ function estimateDataUrlBytes(value: string) {
   return Math.floor((base64.length * 3) / 4) - padding;
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Photo nutrition estimate failed';
-}

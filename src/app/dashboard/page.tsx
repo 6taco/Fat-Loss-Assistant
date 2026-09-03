@@ -31,17 +31,9 @@ import { useReportInboxStore } from '@/stores/useReportInboxStore';
 import { useStrategyStore } from '@/stores/useStrategyStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import {
-  carbColors,
-  getFatBurnIndex,
-  getTodayPlan,
-  mockUser,
-  type CarbType,
-  type DailyReport,
-  type UserProfile,
-  type WeightEntry,
-  type WeeklyReport,
-} from '@/lib/mock-data';
+import { type CarbType, type DailyReport, type UserProfile, type WeightEntry, type WeeklyReport } from '@/lib/types';
+import { carbColors, getFatBurnIndex, getTodayPlan } from '@/lib/domain';
+import { mockUser } from '@/lib/mocks';
 
 const todayIso = new Date().toISOString().slice(0, 10);
 

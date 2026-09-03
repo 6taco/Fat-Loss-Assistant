@@ -1,4 +1,5 @@
-import { calculateMealCalories, type FoodItem } from '@/lib/mock-data';
+import { type FoodItem } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 
 export interface NutritionEstimate {
   description?: string;

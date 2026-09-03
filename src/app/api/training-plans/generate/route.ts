@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { generateTrainingPlan } from '@/lib/coach';
 import { dateToISODate } from '@/lib/server-mappers';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage, parseJsonBody } from '@/lib/route-helpers';
 
-interface GenerateTrainingPlanBody {
-  userId?: string;
-  startDate?: string;
-  days?: number;
-}
+const bodySchema = z.object({
+  userId: z.string().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD').optional(),
+  days: z.number().int().min(1).max(28).optional(),
+});
 
 export async function POST(request: NextRequest) {
-  const body = (await request.json()) as GenerateTrainingPlanBody;
+  const parsed = await parseJsonBody(request, bodySchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const auth = await requireBusinessUser(request, body.userId);
   if (auth.response) return auth.response;
   const userId = auth.context.userId!;
@@ -30,10 +34,6 @@ export async function POST(request: NextRequest) {
       source: 'db',
     });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 500 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Training plan generation failed') }, { status: 500 });
   }
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Training plan generation failed';
 }

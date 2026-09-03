@@ -10,7 +10,9 @@ import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightPredictionStore } from '@/stores/useWeightPredictionStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult, mockUser, sumMealMacros } from '@/lib/mock-data';
+import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
+import { sumMealMacros } from '@/lib/domain';
+import { mockUser } from '@/lib/mocks';
 
 type RangeKey = '7' | '30' | '90' | 'all';
 type MacroDay = Pick<DayPlan, 'date' | 'calories' | 'carb' | 'protein' | 'fat'>;

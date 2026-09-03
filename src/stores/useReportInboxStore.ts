@@ -1,16 +1,8 @@
 import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
-import {
-  calculateMealCalories,
-  DailyReport,
-  DayPlan,
-  MealLog,
-  UserProfile,
-  WeightEntry,
-  WeeklyReport,
-  WeeklyReportRisk,
-} from '@/lib/mock-data';
+import { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry, WeeklyReport, WeeklyReportRisk } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAnalyticsDashboard } from '@/lib/analytics/queries';
 import { requireAdmin } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function GET(request: NextRequest) {
   const authResponse = requireAdmin(request);
@@ -14,11 +15,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       summary: null,
       source: 'db',
-      warning: getErrorMessage(error),
+      warning: getRouteErrorMessage(error, 'Analytics data is temporarily unavailable.'),
     }, { status: 500 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Analytics data is temporarily unavailable.';
-}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WeeklyReportNotReadyError, generateWeeklyReport } from '@/lib/weekly-report';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface GenerateWeeklyReportBody {
   userId?: string;
@@ -20,10 +21,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof WeeklyReportNotReadyError) {
       return NextResponse.json({ error: error.message, code: 'WEEKLY_REPORT_NOT_READY' }, { status: 409 });
     }
-    return NextResponse.json({ report: null, source: 'db', warning: getErrorMessage(error) }, { status: 503 });
+    return NextResponse.json({ report: null, source: 'db', warning: getRouteErrorMessage(error, 'Weekly report generation failed') }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Weekly report generation failed';
-}

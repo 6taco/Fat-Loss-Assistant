@@ -1,4 +1,4 @@
-import type { MealLog, MealType } from './mock-data';
+import type { MealLog, MealType } from './types';
 
 export interface MealGroup {
   mealType: MealType;

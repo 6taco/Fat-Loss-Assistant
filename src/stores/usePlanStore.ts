@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
-import { DayPlan, UserProfile } from '@/lib/mock-data';
+import { DayPlan, UserProfile } from '@/lib/types';
 import { getItem, setItem, KEYS } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
 

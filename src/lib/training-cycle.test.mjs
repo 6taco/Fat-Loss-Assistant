@@ -9,7 +9,7 @@ import {
   muscleGroupLabels,
   removeLastTrainingCycleDay,
   updateTrainingCycleDay,
-} from './mock-data.ts';
+} from './domain.ts';
 
 function makePlan(date) {
   return {

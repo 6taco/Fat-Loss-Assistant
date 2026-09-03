@@ -4,6 +4,7 @@ import { lifestyleToResponse } from '@/lib/strategy-engine/mappers';
 import { upsertLifestyleProfile } from '@/lib/strategy-engine/service';
 import type { UserLifestyleProfile } from '@/lib/strategy-engine/types';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function GET(request: NextRequest) {
   const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     const profile = await prisma.userLifestyleProfile.findUnique({ where: { userId } });
     return NextResponse.json({ profile: profile ? lifestyleToResponse(profile) : null, source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), profile: null }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Lifestyle profile request failed'), profile: null }, { status: 503 });
   }
 }
 
@@ -28,10 +29,7 @@ export async function PATCH(request: NextRequest) {
     const profile = await upsertLifestyleProfile(auth.context.userId!, body);
     return NextResponse.json({ profile, source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Lifestyle profile request failed') }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Lifestyle profile request failed';
-}

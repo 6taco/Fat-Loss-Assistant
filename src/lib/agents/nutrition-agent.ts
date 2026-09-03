@@ -1,4 +1,4 @@
-import { calculateMealCalories } from '@/lib/mock-data';
+import { calculateMealCalories } from '@/lib/domain';
 import type { AgentContext, AgentFindingDto, AgentResult } from '@/lib/agents/types';
 
 export async function runNutritionAgent(context: AgentContext): Promise<AgentResult> {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { weightPredictionRecordToDto } from '@/lib/weight-prediction';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function GET(request: NextRequest) {
   const requestedUserId = request.nextUrl.searchParams.get('userId');
@@ -22,10 +23,7 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json({ predictions: predictions.map(weightPredictionRecordToDto), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), predictions: [] }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Database request failed'), predictions: [] }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Database request failed';
-}

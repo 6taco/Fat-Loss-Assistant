@@ -1,14 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
 import { dateToISODate, toDate } from '@/lib/server-mappers';
-import {
-  type CalorieDeficitSummary,
-  type MealLog,
-  type MuscleGroup,
-  type WeightPredictionPoint,
-  type WeightPredictionResult,
-  muscleGroupLabels,
-} from '@/lib/mock-data';
+import { type CalorieDeficitSummary, type MealLog, type MuscleGroup, type WeightPredictionPoint, type WeightPredictionResult } from '@/lib/types';
+import { muscleGroupLabels } from '@/lib/domain';
 import { buildWeightPrediction } from '@/lib/weight-prediction-core';
 
 export type { WeightPredictionInput, WeightPredictionModel } from '@/lib/weight-prediction-core';

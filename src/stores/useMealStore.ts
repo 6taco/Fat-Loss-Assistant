@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
-import { calculateMealCalories, MealLog, sumMealMacros, UserProfile } from '@/lib/mock-data';
+import { MealLog, UserProfile } from '@/lib/types';
+import { calculateMealCalories, sumMealMacros } from '@/lib/domain';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
 

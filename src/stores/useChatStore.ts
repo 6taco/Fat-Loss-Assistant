@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { getJson, sendJson } from '@/lib/client-api';
-import { ChatMessage, UserProfile } from '@/lib/mock-data';
+import { ChatMessage, UserProfile } from '@/lib/types';
 import { getItem, setItem, KEYS } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
 

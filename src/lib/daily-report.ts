@@ -2,7 +2,8 @@ import { Prisma } from '@prisma/client';
 import { askDeepSeek } from '@/lib/deepseek';
 import { getPrisma } from '@/lib/prisma';
 import { dateToISODate, toDate } from '@/lib/server-mappers';
-import { calculateMealCalories, type CarbType, type DailyReport } from '@/lib/mock-data';
+import { type CarbType, type DailyReport } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 
 export interface DailyReportMetrics {
   userId: string;

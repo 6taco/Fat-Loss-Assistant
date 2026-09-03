@@ -8,7 +8,7 @@ import { toolRegistry } from '@/lib/mcp/registry';
 import { buildIdempotencyKey, ensureUserExists, isToolCallSafe } from '@/lib/mcp/policy';
 import { runAgentWorkflow } from '@/lib/agents/orchestrator';
 import type { AgentIntent } from '@/lib/agents/types';
-import type { ChatMessage } from '@/lib/mock-data';
+import type { ChatMessage } from '@/lib/types';
 import { requireAuth } from '@/lib/auth-server';
 
 interface ChatRequestBody {

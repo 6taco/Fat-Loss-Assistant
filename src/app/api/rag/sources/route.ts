@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function GET(request: NextRequest) {
   const authResponse = requireAdmin(request);
@@ -30,10 +31,7 @@ export async function GET(request: NextRequest) {
       source: 'db',
     });
   } catch (error) {
-    return NextResponse.json({ sources: [], source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ sources: [], source: 'local', warning: getRouteErrorMessage(error, '知识库来源读取失败') });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '知识库来源读取失败';
-}

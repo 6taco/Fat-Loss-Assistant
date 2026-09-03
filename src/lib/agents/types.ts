@@ -1,12 +1,4 @@
-import type {
-  DailyReport,
-  DayPlan,
-  MealLog,
-  UserProfile,
-  WeightEntry,
-  WeeklyReport,
-  WeightPredictionResult,
-} from '@/lib/mock-data';
+import type { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry, WeeklyReport, WeightPredictionResult } from '@/lib/types';
 import type { ToolCallDraft, ToolName } from '@/lib/mcp/types';
 
 export type AgentName = 'nutrition' | 'training' | 'recovery' | 'strategy' | 'coach';

@@ -3,6 +3,7 @@ import { retrieveKnowledge } from '@/lib/rag/retrieval';
 import { rerankChunks } from '@/lib/rag/rerank';
 import type { RagSearchFilters } from '@/lib/rag/types';
 import { requireAuth } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface SearchBody {
   query?: string;
@@ -28,10 +29,7 @@ export async function POST(request: NextRequest) {
       source: 'rag',
     });
   } catch (error) {
-    return NextResponse.json({ chunks: [], source: 'local', warning: getErrorMessage(error) });
+    return NextResponse.json({ chunks: [], source: 'local', warning: getRouteErrorMessage(error, '知识库检索暂时不可用') });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : '知识库检索暂时不可用';
-}

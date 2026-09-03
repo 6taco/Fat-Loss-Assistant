@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Flame, Gauge, Sparkles } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
-import { carbColors, getPlanWeek } from '@/lib/mock-data';
+import { carbColors, getPlanWeek } from '@/lib/domain';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useStrategyStore } from '@/stores/useStrategyStore';
 

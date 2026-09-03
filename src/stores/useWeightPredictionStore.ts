@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { getJson } from '@/lib/client-api';
 import { buildWeightPrediction } from '@/lib/weight-prediction-core';
-import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/mock-data';
+import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 

@@ -18,7 +18,7 @@ import { showAppToast } from '@/components/ui/ToastHost';
 import { getScopedKey } from '@/lib/accounts';
 import { getJson, sendJson } from '@/lib/client-api';
 import { syncLocalDataToServer } from '@/lib/client-sync';
-import type { UserProfile } from '@/lib/mock-data';
+import type { UserProfile } from '@/lib/types';
 import { getItem, KEYS } from '@/lib/storage';
 import { cn } from '@/lib/utils';
 import type {

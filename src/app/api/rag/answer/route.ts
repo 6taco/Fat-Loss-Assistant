@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { answerWithRag } from '@/lib/rag/answer';
 import { requireAuth } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface AnswerBody {
   userId?: string;
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({
-      answer: `当前知识库暂时不可用：${getErrorMessage(error)}\n\n我可以先给一个保守方向：不要基于单日体重波动做激进调整，优先看 7-14 天趋势。`,
+      answer: `当前知识库暂时不可用：${getRouteErrorMessage(error, 'RAG 回答生成失败')}\n\n我可以先给一个保守方向：不要基于单日体重波动做激进调整，优先看 7-14 天趋势。`,
       citations: [],
       confidence: 'low',
       source: 'rag',
@@ -29,6 +30,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'RAG 回答生成失败';
-}

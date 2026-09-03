@@ -9,18 +9,8 @@ import GlassCard from '@/components/ui/GlassCard';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { identifyAnalyticsUser, track } from '@/lib/analytics/client';
 import { useAuth } from '@/components/auth/AuthProvider';
-import {
-  buildTrainingCycleByFrequency,
-  appendTrainingCycleDay,
-  generateCarbCyclePlan,
-  muscleGroupLabels,
-  normalizeTrainingCycle,
-  removeLastTrainingCycleDay,
-  updateTrainingCycleDay,
-  type MuscleGroup,
-  type TrainingDay,
-  type UserProfile,
-} from '@/lib/mock-data';
+import { type MuscleGroup, type TrainingDay, type UserProfile } from '@/lib/types';
+import { buildTrainingCycleByFrequency, appendTrainingCycleDay, generateCarbCyclePlan, muscleGroupLabels, normalizeTrainingCycle, removeLastTrainingCycleDay, updateTrainingCycleDay } from '@/lib/domain';
 import { generateStrategyDayPlans, recommendFatLossStrategy } from '@/lib/strategy-engine/engine';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useStrategyStore } from '@/stores/useStrategyStore';

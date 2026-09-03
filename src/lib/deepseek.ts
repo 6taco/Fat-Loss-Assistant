@@ -1,4 +1,4 @@
-import { ChatMessage } from '@/lib/mock-data';
+import { ChatMessage } from '@/lib/types';
 import { llmFetchJson } from '@/lib/llm-fetch';
 
 const DEEPSEEK_BASE_URL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';

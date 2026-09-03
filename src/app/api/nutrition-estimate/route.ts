@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { askDeepSeek } from '@/lib/deepseek';
 import { parseNutritionEstimate } from '@/lib/nutrition-estimate';
 import { requireAuth } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface NutritionEstimateBody {
   description?: string;
@@ -40,10 +41,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseNutritionEstimate(content);
     return NextResponse.json({ estimate: parsed, source: 'ai', provider: 'deepseek' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), source: 'manual' }, { status: 502 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Nutrition estimate failed'), source: 'manual' }, { status: 502 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Nutrition estimate failed';
-}

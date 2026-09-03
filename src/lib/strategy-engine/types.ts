@@ -1,4 +1,4 @@
-import type { DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/mock-data';
+import type { DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/types';
 
 export type FatLossStrategyType = 'calorie_deficit' | 'if_16_8' | 'carb_cycling';
 export type StrategyIntensity = 'gentle' | 'standard' | 'aggressive';

@@ -3,6 +3,7 @@ import { ingestAnalyticsEvents, isAnalyticsEventName } from '@/lib/analytics/col
 import type { AnalyticsEventEnvelope } from '@/lib/analytics/types';
 import { enforceRateLimit } from '@/lib/auth/rate-limit';
 import { getRequestIp } from '@/lib/auth/request';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface EventsBody {
   events?: AnalyticsEventEnvelope[];
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     const result = await ingestAnalyticsEvents(events.slice(0, 50));
     return NextResponse.json({ ...result, source: 'db' });
   } catch (error) {
-    return NextResponse.json({ inserted: 0, source: 'db', warning: getErrorMessage(error) }, { status: 500 });
+    return NextResponse.json({ inserted: 0, source: 'db', warning: getRouteErrorMessage(error, 'Analytics event write failed.') }, { status: 500 });
   }
 }
 
@@ -43,6 +44,3 @@ function isValidEvent(event: Partial<AnalyticsEventEnvelope>): event is Analytic
   );
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Analytics event write failed.';
-}

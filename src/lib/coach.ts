@@ -5,17 +5,8 @@ import { dateToISODate, dayPlanToResponse, toDate } from '@/lib/server-mappers';
 import { generateWeightPrediction } from '@/lib/weight-prediction';
 import { WeeklyReportNotReadyError, generateWeeklyReport, getPreviousClosedWeekIndex } from '@/lib/weekly-report';
 import { runAgentWorkflow } from '@/lib/agents/orchestrator';
-import {
-  calculateMealCalories,
-  type ActionProposal,
-  type CarbType,
-  type CoachFeed,
-  type CoachInsight,
-  type CoachMemory,
-  type MealType,
-  type MuscleGroup,
-  type NotificationEvent,
-} from '@/lib/mock-data';
+import { type ActionProposal, type CarbType, type CoachFeed, type CoachInsight, type CoachMemory, type MealType, type MuscleGroup, type NotificationEvent } from '@/lib/types';
+import { calculateMealCalories } from '@/lib/domain';
 import { executeToolProposal, dismissToolProposal } from '@/lib/mcp/executor';
 
 const MAX_CALORIE_DELTA = 150;

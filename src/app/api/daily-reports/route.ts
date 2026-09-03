@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { dailyReportToResponse, toDate } from '@/lib/server-mappers';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 export async function GET(request: NextRequest) {
   const requestedUserId = request.nextUrl.searchParams.get('userId');
@@ -26,10 +27,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ reports: reports.map(dailyReportToResponse), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error), reports: [] }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Database request failed'), reports: [] }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Database request failed';
-}

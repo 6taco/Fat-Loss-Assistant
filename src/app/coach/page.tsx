@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { useCoachStore } from '@/stores/useCoachStore';
 import { COACH_PROFILES, useCoachPreferenceStore } from '@/stores/useCoachPreferenceStore';
 import type { CoachGender } from '@/stores/useCoachPreferenceStore';
-import type { ActionProposal, CoachInsight } from '@/lib/mock-data';
+import type { ActionProposal, CoachInsight } from '@/lib/types';
 
 const insightTone: Record<CoachInsight['severity'], { label: string; className: string }> = {
   info: { label: '洞察', className: 'text-accent-blue bg-blue-500/10 border-blue-400/20' },

@@ -1,11 +1,5 @@
-import {
-  generateCarbCyclePlan,
-  getTrainingDayForDateOffset,
-  normalizeTrainingCycle,
-  type CarbType,
-  type DayPlan,
-  type TrainingDay,
-} from '@/lib/mock-data';
+import { type CarbType, type DayPlan, type TrainingDay } from '@/lib/types';
+import { generateCarbCyclePlan, getTrainingDayForDateOffset, normalizeTrainingCycle } from '@/lib/domain';
 import type {
   FatLossStrategyType,
   StrategyContext,

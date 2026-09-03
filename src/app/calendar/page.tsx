@@ -7,7 +7,8 @@ import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
 import Button from '@/components/ui/Button';
 import { usePlanStore } from '@/stores/usePlanStore';
-import { carbColors, DayPlan } from '@/lib/mock-data';
+import { DayPlan } from '@/lib/types';
+import { carbColors } from '@/lib/domain';
 
 export default function CalendarPage() {
   const { plans, loadPlans, toggleComplete } = usePlanStore();

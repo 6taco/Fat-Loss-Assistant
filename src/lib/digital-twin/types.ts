@@ -1,4 +1,4 @@
-import type { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionPoint } from '@/lib/mock-data';
+import type { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionPoint } from '@/lib/types';
 
 export type DigitalTwinConfidence = 'high' | 'medium' | 'low';
 export type PlateauRisk = 'low' | 'medium' | 'high' | 'unknown';

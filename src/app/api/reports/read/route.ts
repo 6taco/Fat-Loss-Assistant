@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getPrisma } from '@/lib/prisma';
 import { requireBusinessUser } from '@/lib/auth-server';
+import { getRouteErrorMessage } from '@/lib/route-helpers';
 
 interface ReadBody {
   userId?: string;
@@ -39,10 +40,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ id: body.id, type: body.type, readAt: readAt.toISOString(), source: 'db' });
   } catch (error) {
-    return NextResponse.json({ error: getErrorMessage(error) }, { status: 503 });
+    return NextResponse.json({ error: getRouteErrorMessage(error, 'Report read update failed') }, { status: 503 });
   }
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Report read update failed';
-}

@@ -14,7 +14,8 @@ import { useUserStore } from '@/stores/useUserStore';
 import { useWeightStore } from '@/stores/useWeightStore';
 import { COACH_PROFILES, useCoachPreferenceStore } from '@/stores/useCoachPreferenceStore';
 import type { CoachProfile } from '@/stores/useCoachPreferenceStore';
-import { ChatCard, ChatMessage, DailyReport, getTodayPlan } from '@/lib/mock-data';
+import { ChatCard, ChatMessage, DailyReport } from '@/lib/types';
+import { getTodayPlan } from '@/lib/domain';
 
 const quickTags = ['今天吃什么？', '平台期怎么办？', '可以吃欺骗餐吗？', '帮我调整计划', '加餐建议'];
 

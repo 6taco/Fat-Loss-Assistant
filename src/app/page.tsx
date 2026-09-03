@@ -7,7 +7,7 @@ import gsap from 'gsap';
 import { Activity, Leaf, Sparkles, Utensils } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import { getActiveAccount } from '@/lib/accounts';
-import { UserProfile } from '@/lib/mock-data';
+import { UserProfile } from '@/lib/types';
 import { getItem, KEYS } from '@/lib/storage';
 
 gsap.registerPlugin(useGSAP);

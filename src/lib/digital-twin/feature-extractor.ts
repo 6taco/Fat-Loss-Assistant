@@ -1,4 +1,4 @@
-import { calculateMealCalories } from '@/lib/mock-data';
+import { calculateMealCalories } from '@/lib/domain';
 import type { DigitalTwinDataSet, DigitalTwinFeatures, PlateauRisk } from '@/lib/digital-twin/types';
 
 export function extractDigitalTwinFeatures(data: DigitalTwinDataSet, horizonDays = 30): DigitalTwinFeatures {

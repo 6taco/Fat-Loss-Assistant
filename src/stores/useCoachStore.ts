@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
 import { getJson, sendJson } from '@/lib/client-api';
 import { syncLocalDataToServer } from '@/lib/client-sync';
-import type { ActionProposal, CoachFeed } from '@/lib/mock-data';
+import type { ActionProposal, CoachFeed } from '@/lib/types';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 

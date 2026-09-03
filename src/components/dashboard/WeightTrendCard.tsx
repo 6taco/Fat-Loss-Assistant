@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, TrendingDown } from 'lucide-react';
-import type { WeightEntry } from '@/lib/mock-data';
+import type { WeightEntry } from '@/lib/types';
 import GlassCard from '@/components/ui/GlassCard';
 
 const chartWidth = 320;

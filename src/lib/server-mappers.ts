@@ -1,19 +1,5 @@
-import {
-  ChatMessage,
-  DailyReport,
-  DayPlan,
-  defaultTrainingSchedule,
-  type FoodItem,
-  MealLog,
-  type MealType,
-  type MuscleGroup,
-  type Somatotype,
-  type TrainingDay,
-  UserProfile,
-  WeightEntry,
-  WeeklyReport,
-  muscleGroupLabels,
-} from '@/lib/mock-data';
+import { ChatMessage, DailyReport, DayPlan, type FoodItem, MealLog, type MealType, type MuscleGroup, type Somatotype, type TrainingDay, UserProfile, WeightEntry, WeeklyReport } from '@/lib/types';
+import { defaultTrainingSchedule, muscleGroupLabels } from '@/lib/domain';
 import { weeklyReportRecordToDto } from '@/lib/weekly-report';
 
 export function toDate(date: string): Date {
