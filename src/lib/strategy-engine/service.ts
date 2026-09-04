@@ -134,7 +134,6 @@ export async function activateStrategy(userId: string, options: {
       where: { userId, status: 'active' },
       data: { status: 'superseded', endDate: toDate(startDate) },
     });
-
     const strategy = await tx.fatLossStrategyProfile.create({
       data: {
         userId,
@@ -175,7 +174,9 @@ export async function activateStrategy(userId: string, options: {
       plans,
       recommendation,
     };
-  });
+    // 28 day-plan upserts over a remote TLS connection far exceed the default
+    // 5s interactive-transaction timeout; activation used to abort with P2028.
+  }, { timeout: 60_000, maxWait: 5_000 });
 }
 
 export async function recheckStrategy(userId: string) {

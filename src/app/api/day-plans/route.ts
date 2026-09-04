@@ -31,6 +31,9 @@ const patchBodySchema = z.object({
   completed: z.boolean().optional(),
 });
 
+// Saving a plan batch can upsert hundreds of rows in one transaction.
+export const maxDuration = 60;
+
 export async function GET(request: NextRequest) {
   const auth = await requireBusinessUser(request, request.nextUrl.searchParams.get('userId'));
   if (auth.response) return auth.response;
@@ -102,6 +105,9 @@ export async function POST(request: NextRequest) {
           trainingLabel: plan.trainingLabel,
         },
       })),
+      // Up to 400 upserts over a remote TLS connection exceed the default
+      // batch transaction timeout.
+      { timeout: 60_000, maxWait: 5_000 },
     );
 
     // Re-read only the affected date range instead of the user's whole table.

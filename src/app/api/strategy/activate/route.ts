@@ -4,6 +4,10 @@ import type { FatLossStrategyType, StrategyIntensity } from '@/lib/strategy-engi
 import { requireBusinessUser } from '@/lib/auth-server';
 import { getRouteErrorMessage } from '@/lib/route-helpers';
 
+// Activation writes a strategy row plus 28 day-plan upserts in one
+// transaction; on a remote database that legitimately takes tens of seconds.
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   const body = await request.json() as {
     userId?: string;
