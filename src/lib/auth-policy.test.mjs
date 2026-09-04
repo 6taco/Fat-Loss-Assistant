@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import {
   authorizeUser,
-} from './auth-policy.js';
+} from './auth-policy.ts';
 
 test('requires authentication before accessing a user resource', () => {
   assert.deepEqual(authorizeUser({ sessionUserId: null, requestedUserId: 'user-1' }), {

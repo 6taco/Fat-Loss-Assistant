@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { normalizeEmail, validateEmail, validatePassword } from './validation.js';
+import { normalizeEmail, validateEmail, validatePassword } from './validation.ts';
 
 test('normalizes email addresses before persistence', () => {
   assert.equal(normalizeEmail('  User@Example.COM '), 'user@example.com');

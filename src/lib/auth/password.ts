@@ -1,20 +1,25 @@
 import { promisify } from 'node:util';
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 
-const scrypt = promisify(scryptCallback);
+const scrypt = promisify(scryptCallback) as unknown as (
+  password: string | Buffer,
+  salt: string | Buffer,
+  keylen: number,
+  options: { N: number; r: number; p: number; maxmem: number },
+) => Promise<Buffer>;
 const N = 32_768;
 const R = 8;
 const P = 1;
 const SALT_BYTES = 16;
 const KEY_BYTES = 64;
 
-export async function hashPassword(password) {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(SALT_BYTES);
   const derived = await scrypt(password, salt, KEY_BYTES, { N, r: R, p: P, maxmem: 64 * 1024 * 1024 });
   return `scrypt$N=${N},r=${R},p=${P}$${salt.toString('base64url')}$${Buffer.from(derived).toString('base64url')}`;
 }
 
-export async function verifyPassword(password, encodedHash) {
+export async function verifyPassword(password: string, encodedHash: string): Promise<boolean> {
   try {
     const [algorithm, params, saltText, hashText] = String(encodedHash).split('$');
     if (algorithm !== 'scrypt' || params !== `N=${N},r=${R},p=${P}` || !saltText || !hashText) return false;

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authErrorResponse } from '@/lib/auth/errors';
-import { withAuthDatabaseRetry } from '@/lib/auth/database-retry.js';
+import { withAuthDatabaseRetry } from '@/lib/auth/database-retry';
 import { enforceRateLimit } from '@/lib/auth/rate-limit';
 import { getRequestIp } from '@/lib/auth/request';
 import { requestRegistrationCode } from '@/lib/auth/service';
-import { normalizeEmail } from '@/lib/auth/validation.js';
+import { normalizeEmail } from '@/lib/auth/validation';
 
 export async function POST(request: NextRequest) {
   try {

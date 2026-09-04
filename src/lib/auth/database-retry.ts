@@ -13,7 +13,10 @@ const RETRYABLE_CODES = new Set([
   'PROTOCOL_CONNECTION_LOST',
 ]);
 
-export async function withAuthDatabaseRetry(operation, options = {}) {
+export async function withAuthDatabaseRetry<T>(
+  operation: () => Promise<T>,
+  options: { retries?: number; delayMs?: number } = {},
+): Promise<T> {
   const retries = options.retries ?? 1;
   const delayMs = options.delayMs ?? 250;
 
@@ -27,7 +30,7 @@ export async function withAuthDatabaseRetry(operation, options = {}) {
   }
 }
 
-function isTransientDatabaseError(error) {
+function isTransientDatabaseError(error: unknown): boolean {
   const code = findErrorField(error, 'code');
   if (typeof code === 'string' && RETRYABLE_CODES.has(code)) return true;
 
@@ -38,15 +41,19 @@ function isTransientDatabaseError(error) {
   });
 }
 
-function findErrorField(error, field) {
-  let current = error;
+function findErrorField(error: unknown, field: string): unknown {
+  let current: unknown = error;
   for (let depth = 0; current && depth < 3; depth += 1) {
-    if (typeof current === 'object' && field in current) return current[field];
-    current = typeof current === 'object' ? current.cause : null;
+    if (typeof current === 'object' && current !== null && field in current) {
+      return (current as Record<string, unknown>)[field];
+    }
+    current = typeof current === 'object' && current !== null
+      ? (current as { cause?: unknown }).cause
+      : null;
   }
   return undefined;
 }
 
-function sleep(delayMs) {
+function sleep(delayMs: number) {
   return new Promise(resolve => setTimeout(resolve, delayMs));
 }

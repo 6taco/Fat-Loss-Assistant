@@ -1,7 +1,20 @@
-export const orderedMealTypes = ['breakfast', 'lunch', 'dinner', 'snack'];
+import type { MealLog, MealType } from '@/lib/types';
 
-export function groupMealsByType(meals) {
-  const byType = new Map();
+export interface MealGroup {
+  mealType: MealType;
+  meals: MealLog[];
+  summary: {
+    carb: number;
+    protein: number;
+    fat: number;
+    calories: number;
+  };
+}
+
+export const orderedMealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+export function groupMealsByType(meals: MealLog[]): MealGroup[] {
+  const byType = new Map<MealType, MealGroup>();
 
   for (const meal of meals) {
     const group = byType.get(meal.mealType) || {
@@ -20,7 +33,7 @@ export function groupMealsByType(meals) {
 
   return orderedMealTypes
     .map(mealType => byType.get(mealType))
-    .filter(Boolean)
+    .filter((group): group is MealGroup => Boolean(group))
     .map(group => ({
       ...group,
       meals: [...group.meals].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { withAuthDatabaseRetry } from './database-retry.js';
+import { withAuthDatabaseRetry } from './database-retry.ts';
 
 test('retries a transient database connection failure once', async () => {
   let attempts = 0;

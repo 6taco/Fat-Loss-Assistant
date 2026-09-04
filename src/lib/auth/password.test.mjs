@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, verifyPassword } from './password.ts';
 
 test('hashes and verifies a password without storing it in plaintext', async () => {
   const encoded = await hashPassword('correct horse battery staple');

@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 import { askDeepSeek } from '@/lib/deepseek';
 import { getPrisma } from '@/lib/prisma';
 import { dateToISODate, toDate } from '@/lib/server-mappers';
-import { getCurrentUserWeekIndex, getPreviousClosedWeekIndex } from './weekly-report-schedule.mjs';
+import { getCurrentUserWeekIndex, getPreviousClosedWeekIndex } from './weekly-report-schedule';
 import { type WeeklyReport, type WeeklyReportMetrics, type WeeklyReportRisk } from '@/lib/types';
 import { calculateMealCalories } from '@/lib/domain';
 

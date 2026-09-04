@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { resolveEmailConfig } from './email-config.js';
+import { resolveEmailConfig } from './email-config.ts';
 
 test('resolves QQ SMTP configuration', () => {
   const config = resolveEmailConfig({

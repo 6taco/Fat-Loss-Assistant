@@ -4,7 +4,7 @@ import {
   IMPORT_DATASETS,
   validateImportChunk,
   sanitizeImportItem,
-} from './account-import.js';
+} from './account-import.ts';
 
 test('accepts a supported import dataset with no more than 100 items', () => {
   const result = validateImportChunk('weights', [

@@ -1,5 +1,5 @@
 import { getPrisma } from '@/lib/prisma';
-import { createRawToken, hashToken } from '@/lib/auth/tokens.js';
+import { createRawToken, hashToken } from '@/lib/auth/tokens';
 import { getRequestUserAgent, hashRequestIp } from '@/lib/auth/request';
 
 export const AUTH_COOKIE_NAME = 'fla_session';

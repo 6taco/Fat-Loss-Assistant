@@ -6,7 +6,7 @@ import {
   hashRegistrationCode,
   isRegistrationCode,
   registrationCodeMatches,
-} from './registration-code.js';
+} from './registration-code.ts';
 
 test('creates a six digit registration code', () => {
   for (let index = 0; index < 100; index += 1) {

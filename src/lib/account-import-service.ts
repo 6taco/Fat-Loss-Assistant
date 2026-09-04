@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { getPrisma } from '@/lib/prisma';
-import { IMPORT_DATASETS, validateImportChunk } from '@/lib/account-import.js';
+import { IMPORT_DATASETS, validateImportChunk } from '@/lib/account-import';
 import { toDate } from '@/lib/server-mappers';
 
 const MAX_JSON_BYTES = 512 * 1024;
@@ -19,7 +19,7 @@ export async function startImport(authUserId: string, input: { sourceAccountId?:
   const datasets = Array.isArray(input.datasets)
     ? [...new Set(input.datasets.filter((item): item is string => typeof item === 'string'))]
     : [];
-  if (!datasets.length || datasets.some(dataset => !IMPORT_DATASETS.includes(dataset))) {
+  if (!datasets.length || datasets.some(dataset => !(IMPORT_DATASETS as readonly string[]).includes(dataset))) {
     throw new AccountImportError('INVALID_DATASETS');
   }
 

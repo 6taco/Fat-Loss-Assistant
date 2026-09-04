@@ -1,4 +1,23 @@
-export function buildDailyReportNotification({ userId, reportId, date, score, sentAt = new Date() }) {
+type ReportNotificationType = 'daily_report' | 'weekly_report';
+
+export interface BuiltReportNotification {
+  userId: string;
+  type: ReportNotificationType;
+  title: string;
+  body: string;
+  payload: Record<string, unknown> & { reportId: string };
+  status: 'sent';
+  scheduledAt: Date;
+  sentAt: Date;
+}
+
+export function buildDailyReportNotification({ userId, reportId, date, score, sentAt = new Date() }: {
+  userId: string;
+  reportId: string;
+  date: string;
+  score: number;
+  sentAt?: Date;
+}): BuiltReportNotification {
   return {
     userId,
     type: 'daily_report',
@@ -19,7 +38,15 @@ export function buildWeeklyReportNotification({
   endDate,
   score,
   sentAt = new Date(),
-}) {
+}: {
+  userId: string;
+  reportId: string;
+  weekIndex: number;
+  startDate: string;
+  endDate: string;
+  score: number;
+  sentAt?: Date;
+}): BuiltReportNotification {
   return {
     userId,
     type: 'weekly_report',
@@ -32,7 +59,7 @@ export function buildWeeklyReportNotification({
   };
 }
 
-export function getReportNotificationKey(notification) {
+export function getReportNotificationKey(notification: Pick<BuiltReportNotification, 'type' | 'payload'>): string {
   const reportId = notification.payload?.reportId;
   return `${notification.type}:${reportId || ''}`;
 }

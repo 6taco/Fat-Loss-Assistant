@@ -1,4 +1,18 @@
-export function resolveEmailConfig(env = process.env) {
+export type EmailConfig =
+  | {
+      provider: 'smtp';
+      from: string;
+      appUrl: string;
+      smtp: { host: string; port: number; secure: boolean; user: string; pass: string };
+    }
+  | {
+      provider: 'resend';
+      from: string;
+      appUrl: string;
+      resendApiKey: string;
+    };
+
+export function resolveEmailConfig(env: NodeJS.ProcessEnv = process.env): EmailConfig {
   const appUrl = env.APP_URL;
   const from = env.EMAIL_FROM || env.RESEND_FROM_EMAIL;
   const provider = (env.EMAIL_PROVIDER || (env.SMTP_HOST ? 'smtp' : 'resend')).toLowerCase();
@@ -41,7 +55,7 @@ export function resolveEmailConfig(env = process.env) {
   throw new Error('EMAIL_PROVIDER must be smtp or resend');
 }
 
-function parsePort(value) {
+function parsePort(value: string | undefined): number {
   const port = Number(value || 465);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('SMTP_PORT must be a valid TCP port');

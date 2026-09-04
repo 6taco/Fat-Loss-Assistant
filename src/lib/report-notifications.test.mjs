@@ -5,7 +5,7 @@ import {
   buildDailyReportNotification,
   buildWeeklyReportNotification,
   getReportNotificationKey,
-} from './report-notifications.js';
+} from './report-notifications.ts';
 
 const sentAt = new Date('2026-05-29T16:00:00.000Z');
 

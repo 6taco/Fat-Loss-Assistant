@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authErrorResponse } from '@/lib/auth/errors';
 import { enforceRateLimit } from '@/lib/auth/rate-limit';
 import { requestPasswordReset } from '@/lib/auth/service';
-import { normalizeEmail } from '@/lib/auth/validation.js';
+import { normalizeEmail } from '@/lib/auth/validation';
 import { getRequestIp } from '@/lib/auth/request';
 
 export async function POST(request: NextRequest) {

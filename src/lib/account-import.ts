@@ -7,23 +7,26 @@ export const IMPORT_DATASETS = [
   'dailyReports',
   'weeklyReports',
   'lifestyle',
-];
+] as const;
 
 const MAX_IMPORT_ITEMS = 100;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export function sanitizeImportItem(item) {
+export function sanitizeImportItem(item: unknown): Record<string, unknown> {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return {};
   return Object.fromEntries(Object.entries(item).filter(([key]) => !['userId', 'authUserId', 'ownerId'].includes(key)));
 }
 
-export function validateImportChunk(dataset, items) {
-  if (!IMPORT_DATASETS.includes(dataset)) return { ok: false, error: 'UNSUPPORTED_DATASET' };
+export function validateImportChunk(dataset: string, items: unknown):
+  | { ok: true; items: Record<string, unknown>[] }
+  | { ok: false; error: string } {
+  if (!(IMPORT_DATASETS as readonly string[]).includes(dataset)) return { ok: false, error: 'UNSUPPORTED_DATASET' };
   if (!Array.isArray(items) || items.length > MAX_IMPORT_ITEMS) return { ok: false, error: 'INVALID_CHUNK_SIZE' };
 
   for (const rawItem of items) {
     const item = sanitizeImportItem(rawItem);
-    if (typeof item.sourceId !== 'string' || !item.sourceId.trim() || item.sourceId.length > 255) {
+    const sourceId = item.sourceId;
+    if (typeof sourceId !== 'string' || !sourceId.trim() || sourceId.length > 255) {
       return { ok: false, error: 'INVALID_SOURCE_ID' };
     }
     const error = validateDatasetItem(dataset, item);
@@ -33,7 +36,7 @@ export function validateImportChunk(dataset, items) {
   return { ok: true, items: items.map(sanitizeImportItem) };
 }
 
-function validateDatasetItem(dataset, item) {
+function validateDatasetItem(dataset: string, item: Record<string, unknown>): string | null {
   if (dataset === 'user') {
     if (!inRange(item.age, 14, 80)) return 'INVALID_AGE';
     if (!inRange(item.height, 120, 230)) return 'INVALID_HEIGHT';
@@ -62,12 +65,12 @@ function validateDatasetItem(dataset, item) {
   return null;
 }
 
-function validDate(value) {
+function validDate(value: unknown): boolean {
   if (typeof value !== 'string' || !ISO_DATE.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-function inRange(value, min, max) {
+function inRange(value: unknown, min: number, max: number): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
 }

@@ -1,10 +1,10 @@
 import { getPrisma } from '@/lib/prisma';
 import { AuthError } from '@/lib/auth/errors';
 import { sendPasswordResetEmail, sendRegistrationCodeEmail } from '@/lib/auth/email';
-import { hashPassword, verifyPassword } from '@/lib/auth/password.js';
-import { createRawToken, hashToken } from '@/lib/auth/tokens.js';
-import { createRegistrationCode, hashRegistrationCode, isRegistrationCode, registrationCodeMatches } from '@/lib/auth/registration-code.js';
-import { normalizeEmail, validateEmail, validatePassword } from '@/lib/auth/validation.js';
+import { hashPassword, verifyPassword } from '@/lib/auth/password';
+import { createRawToken, hashToken } from '@/lib/auth/tokens';
+import { createRegistrationCode, hashRegistrationCode, isRegistrationCode, registrationCodeMatches } from '@/lib/auth/registration-code';
+import { normalizeEmail, validateEmail, validatePassword } from '@/lib/auth/validation';
 import { createSession, revokeAllSessions } from '@/lib/auth/session';
 
 const RESET_TTL_MS = 60 * 60 * 1_000;

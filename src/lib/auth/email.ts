@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
-import { resolveEmailConfig } from '@/lib/auth/email-config.js';
+import { resolveEmailConfig } from '@/lib/auth/email-config';
 
 export async function sendPasswordResetEmail(email: string, token: string) {
   const config = resolveEmailConfig();

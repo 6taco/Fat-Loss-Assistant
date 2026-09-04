@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getPreviousClosedWeekIndex } from './weekly-report-schedule.mjs';
+import { getPreviousClosedWeekIndex } from './weekly-report-schedule.ts';
 
 test('closes the first user week at Beijing Monday 00:20 even though UTC is still Sunday', () => {
   const now = new Date('2026-08-02T16:20:00.000Z');

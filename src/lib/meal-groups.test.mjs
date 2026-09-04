@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { groupMealsByType } from './meal-groups.js';
+import { groupMealsByType } from './meal-groups.ts';
 
 const baseMeal = {
   date: '2026-05-29',

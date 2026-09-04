@@ -5,7 +5,7 @@ import {
   createDismissedInstallPromptState,
   createInstalledInstallPromptState,
   shouldShowInstallPrompt,
-} from './pwa-install-state.js';
+} from './pwa-install-state.ts';
 
 test('never shows the automatic install prompt after the user closes it', () => {
   const state = createDismissedInstallPromptState();

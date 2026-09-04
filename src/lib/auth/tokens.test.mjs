@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createRawToken, hashToken } from './tokens.js';
+import { createRawToken, hashToken } from './tokens.ts';
 
 test('creates URL-safe random tokens', () => {
   const token = createRawToken();
