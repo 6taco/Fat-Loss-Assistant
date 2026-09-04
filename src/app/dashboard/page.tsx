@@ -352,6 +352,15 @@ export default function DashboardPage() {
             <button
               onClick={() => {
                 setShowSettings(false);
+                router.push('/settings');
+              }}
+              className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
+            >
+              提醒设置
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings(false);
                 router.push('/import-local');
               }}
               className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"

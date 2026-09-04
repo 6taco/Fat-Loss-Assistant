@@ -3,6 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 import AnalyticsProvider from '@/components/analytics/AnalyticsProvider';
 import DataInitProvider from '@/components/providers/DataInitProvider';
+import ReminderScheduler from '@/components/settings/ReminderScheduler';
 import TabBar from '@/components/layout/TabBar';
 import ToastHost from '@/components/ui/ToastHost';
 import PWAInstallSheet from '@/components/pwa/PWAInstallSheet';
@@ -49,6 +50,7 @@ export default function RootLayout({
           <main className="max-w-[430px] mx-auto relative min-h-dvh">
             <DataInitProvider />
             <AnalyticsProvider />
+            <ReminderScheduler />
             {children}
           </main>
           <TabBar />
