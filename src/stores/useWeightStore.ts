@@ -4,9 +4,11 @@ import { getJson, sendJson } from '@/lib/client-api';
 import { UserProfile, WeightEntry } from '@/lib/types';
 import { getItem, setItem, KEYS } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
+import { isFreshData } from '@/lib/staleness';
 
 interface WeightState {
   entries: WeightEntry[];
+  lastFetchedAt: number;
   loadEntries: () => void;
   addEntry: (entry: WeightEntry) => void;
 }
@@ -21,8 +23,10 @@ function sortEntries(entries: WeightEntry[]) {
 
 export const useWeightStore = create<WeightState>((set, get) => ({
   entries: [],
+  lastFetchedAt: 0,
 
   loadEntries: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const entries = sortEntries(getItem<WeightEntry[]>(getScopedKey(KEYS.WEIGHT), []));
     set({ entries });
 
@@ -33,7 +37,7 @@ export const useWeightStore = create<WeightState>((set, get) => ({
       if (!data?.entries?.length) return;
       const sorted = sortEntries(data.entries);
       setItem(getScopedKey(KEYS.WEIGHT), sorted);
-      set({ entries: sorted });
+      set({ entries: sorted, lastFetchedAt: Date.now() });
     });
   },
 
@@ -44,7 +48,7 @@ export const useWeightStore = create<WeightState>((set, get) => ({
       ? current.map((e, i) => i === existing ? entry : e)
       : [...current, entry]);
     setItem(getScopedKey(KEYS.WEIGHT), updated);
-    set({ entries: updated });
+    set({ entries: updated, lastFetchedAt: Date.now() });
 
     const userId = getLocalUserId();
     track('weight_log_create', {

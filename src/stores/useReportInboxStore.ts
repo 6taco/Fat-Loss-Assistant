@@ -4,13 +4,16 @@ import { getJson, sendJson } from '@/lib/client-api';
 import { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry, WeeklyReport, WeeklyReportRisk } from '@/lib/types';
 import { calculateMealCalories } from '@/lib/domain';
 import { getScopedKey } from '@/lib/accounts';
-import { getItem, KEYS, setItem } from '@/lib/storage';
+import { getItem, KEYS } from '@/lib/storage';
+import { writeDailyReportsCache, writeWeeklyReportsCache } from '@/lib/report-cache';
+import { isFreshData } from '@/lib/staleness';
 
 interface ReportInboxState {
   dailyReports: DailyReport[];
   weeklyReports: WeeklyReport[];
   isLoading: boolean;
   error: string;
+  lastFetchedAt: number;
   loadReports: () => void;
   generateWeeklyReport: (force?: boolean) => Promise<WeeklyReport | null>;
   markRead: (type: 'daily' | 'weekly', id: string) => void;
@@ -33,8 +36,10 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
   weeklyReports: [],
   isLoading: false,
   error: '',
+  lastFetchedAt: 0,
 
   loadReports: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const localDaily = sortDaily(getItem<DailyReport[]>(getScopedKey(KEYS.DAILY_REPORTS), []));
     const localWeekly = sortWeekly(getItem<WeeklyReport[]>(getScopedKey(KEYS.WEEKLY_REPORTS), []));
     set({ dailyReports: localDaily, weeklyReports: localWeekly, error: '' });
@@ -47,17 +52,20 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
       getJson<{ reports: DailyReport[] }>(`/api/daily-reports?userId=${encodeURIComponent(userId)}&limit=14`),
       getJson<{ reports: WeeklyReport[] }>(`/api/weekly-reports?userId=${encodeURIComponent(userId)}&limit=8`),
     ]).then(([daily, weekly]) => {
+      let lastFetchedAt = get().lastFetchedAt;
       if (daily?.reports) {
-        const reports = sortDaily(daily.reports);
-        setItem(getScopedKey(KEYS.DAILY_REPORTS), reports);
+        // Merging write: the daily-report store shares this cache key with a
+        // shorter list and must not evict these entries.
+        const reports = writeDailyReportsCache(daily.reports);
         set({ dailyReports: reports });
+        lastFetchedAt = Date.now();
       }
       if (weekly?.reports) {
-        const reports = sortWeekly(weekly.reports);
-        setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
+        const reports = writeWeeklyReportsCache(weekly.reports);
         set({ weeklyReports: reports });
+        lastFetchedAt = Date.now();
       }
-      set({ isLoading: false });
+      set({ isLoading: false, lastFetchedAt });
     });
   },
 
@@ -80,8 +88,7 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
           set({ isLoading: false, error: '这一周还没有足够数据生成周报。' });
           return null;
         }
-        const reports = sortWeekly([fallback, ...get().weeklyReports.filter(report => report.id !== fallback.id)]);
-        setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
+        const reports = writeWeeklyReportsCache([fallback, ...get().weeklyReports.filter(report => report.id !== fallback.id)]);
         set({ weeklyReports: reports, isLoading: false });
         return fallback;
       }
@@ -91,8 +98,7 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
         return null;
       }
 
-      const reports = sortWeekly([data.report, ...get().weeklyReports.filter(report => report.id !== data.report!.id)]);
-      setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
+      const reports = writeWeeklyReportsCache([data.report, ...get().weeklyReports.filter(report => report.id !== data.report!.id)]);
       set({ weeklyReports: reports, isLoading: false });
       return data.report;
     } catch {
@@ -101,8 +107,7 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
         set({ isLoading: false, error: '这一周还没有足够数据生成周报。' });
         return null;
       }
-      const reports = sortWeekly([fallback, ...get().weeklyReports.filter(report => report.id !== fallback.id)]);
-      setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
+      const reports = writeWeeklyReportsCache([fallback, ...get().weeklyReports.filter(report => report.id !== fallback.id)]);
       set({ weeklyReports: reports, isLoading: false });
       return fallback;
     }
@@ -114,8 +119,7 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
 
     if (type === 'daily') {
       const report = get().dailyReports.find(item => item.id === id);
-      const reports = get().dailyReports.map(report => report.id === id ? { ...report, readAt } : report);
-      setItem(getScopedKey(KEYS.DAILY_REPORTS), reports);
+      const reports = writeDailyReportsCache(get().dailyReports.map(report => report.id === id ? { ...report, readAt } : report));
       set({ dailyReports: reports });
       track('daily_report_view', {
         report_id: id,
@@ -124,8 +128,7 @@ export const useReportInboxStore = create<ReportInboxState>((set, get) => ({
       }, { userId });
     } else {
       const report = get().weeklyReports.find(item => item.id === id);
-      const reports = get().weeklyReports.map(report => report.id === id ? { ...report, readAt } : report);
-      setItem(getScopedKey(KEYS.WEEKLY_REPORTS), reports);
+      const reports = writeWeeklyReportsCache(get().weeklyReports.map(report => report.id === id ? { ...report, readAt } : report));
       set({ weeklyReports: reports });
       track('weekly_report_view', {
         report_id: id,

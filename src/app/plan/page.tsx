@@ -93,6 +93,8 @@ export default function PlanPage() {
     try {
       const result = await activate(strategyType);
       if (!result) throw new Error('策略激活失败');
+      // Bypass the plan store's fetch dedupe so the fresh plans show up.
+      usePlanStore.setState({ lastFetchedAt: 0 });
       await loadPlans();
       showAppToast('已从今天重新生成每日计划。', 'success');
     } catch {

@@ -5,11 +5,13 @@ import { syncLocalDataToServer } from '@/lib/client-sync';
 import type { ActionProposal, CoachFeed } from '@/lib/types';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
+import { isFreshData } from '@/lib/staleness';
 
 interface CoachState {
   feed: CoachFeed;
   isLoading: boolean;
   error: string;
+  lastFetchedAt: number;
   loadFeed: () => void;
   runDaily: () => Promise<void>;
   runWeekly: () => Promise<void>;
@@ -36,8 +38,10 @@ export const useCoachStore = create<CoachState>((set, get) => ({
   feed: emptyFeed,
   isLoading: false,
   error: '',
+  lastFetchedAt: 0,
 
   loadFeed: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const localFeed = getItem<CoachFeed>(getCoachFeedKey(), emptyFeed);
     set({ feed: normalizeFeed(localFeed), error: '' });
 
@@ -48,7 +52,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
     void getJson<{ feed: CoachFeed }>(`/api/coach/feed?userId=${encodeURIComponent(userId)}`).then(data => {
       const feed = normalizeFeed(data?.feed || localFeed);
       setItem(getCoachFeedKey(), feed);
-      set({ feed, isLoading: false });
+      set({ feed, isLoading: false, lastFetchedAt: Date.now() });
     });
   },
 
@@ -115,6 +119,8 @@ export const useCoachStore = create<CoachState>((set, get) => ({
       proposal_type: data.proposal.type,
       origin: 'coach_feed',
     }, { userId });
+    // Reset the stamp so loadFeed actually refetches after this mutation.
+    set({ lastFetchedAt: 0 });
     get().loadFeed();
   },
 
@@ -136,6 +142,8 @@ export const useCoachStore = create<CoachState>((set, get) => ({
       proposal_type: data.proposal.type,
       origin: 'coach_feed',
     }, { userId });
+    // Reset the stamp so loadFeed actually refetches after this mutation.
+    set({ lastFetchedAt: 0 });
     get().loadFeed();
   },
 }));

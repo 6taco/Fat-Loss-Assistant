@@ -4,10 +4,12 @@ import { getJson, sendJson } from '@/lib/client-api';
 import { DayPlan, UserProfile } from '@/lib/types';
 import { getItem, setItem, KEYS } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
+import { isFreshData } from '@/lib/staleness';
 
 interface PlanState {
   plans: DayPlan[];
   activePlan: boolean;
+  lastFetchedAt: number;
   loadPlans: () => void;
   setPlans: (plans: DayPlan[], planType?: string) => void;
   toggleComplete: (date: string) => void;
@@ -20,8 +22,10 @@ function getLocalUserId() {
 export const usePlanStore = create<PlanState>((set, get) => ({
   plans: [],
   activePlan: false,
+  lastFetchedAt: 0,
 
   loadPlans: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const plans = getItem<DayPlan[]>(getScopedKey(KEYS.PLAN), []);
     set({ plans, activePlan: plans.length > 0 });
 
@@ -31,14 +35,14 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     void getJson<{ plans: DayPlan[] }>(`/api/day-plans?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.plans?.length) return;
       setItem(getScopedKey(KEYS.PLAN), data.plans);
-      set({ plans: data.plans, activePlan: true });
+      set({ plans: data.plans, activePlan: true, lastFetchedAt: Date.now() });
     });
   },
 
   setPlans: (plans, planType) => {
     setItem(getScopedKey(KEYS.PLAN), plans);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('strategy-cache-change'));
-    set({ plans, activePlan: true });
+    set({ plans, activePlan: true, lastFetchedAt: Date.now() });
 
     const userId = getLocalUserId();
     track('plan_generate', {

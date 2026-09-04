@@ -3,6 +3,7 @@ import { track } from '@/lib/analytics/client';
 import { getScopedKey } from '@/lib/accounts';
 import { getJson, sendJson } from '@/lib/client-api';
 import { getItem, KEYS, setItem } from '@/lib/storage';
+import { isFreshData } from '@/lib/staleness';
 import type {
   ActiveStrategy,
   StrategyCurrentResponse,
@@ -18,6 +19,7 @@ interface StrategyState {
   executionRate: number;
   isLoading: boolean;
   error: string;
+  lastFetchedAt: number;
   loadCurrent: () => void;
   saveLifestyle: (profile: Partial<UserLifestyleProfile>) => Promise<UserLifestyleProfile | null>;
   recommend: (profile?: Partial<UserLifestyleProfile>) => Promise<StrategyRecommendation | null>;
@@ -36,8 +38,10 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
   executionRate: 0,
   isLoading: false,
   error: '',
+  lastFetchedAt: 0,
 
   loadCurrent: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const local = getItem<StrategyCurrentResponse | null>(getScopedKey(KEYS.STRATEGY), null);
     if (local) {
       set({
@@ -63,6 +67,7 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
         proposals: data.adjustmentProposals || [],
         executionRate: data.executionRate || 0,
         isLoading: false,
+        lastFetchedAt: Date.now(),
       });
       track('strategy_recommend_view', {
         strategy_type: data.recommendation.strategyType,
@@ -128,6 +133,7 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
       proposals: current?.adjustmentProposals || [],
       executionRate: current?.executionRate || 0,
       isLoading: false,
+      lastFetchedAt: Date.now(),
     });
     track('strategy_recommend_accept', {
       strategy_type: data.strategy.strategyType,
@@ -141,7 +147,8 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
     if (!userId) return;
     set({ isLoading: true, error: '' });
     await sendJson('/api/strategy/recheck', 'POST', { userId });
-    set({ isLoading: false });
+    // Reset the staleness stamp so loadCurrent actually refetches the result.
+    set({ isLoading: false, lastFetchedAt: 0 });
     get().loadCurrent();
   },
 }));

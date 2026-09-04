@@ -5,9 +5,11 @@ import { MealLog, UserProfile } from '@/lib/types';
 import { calculateMealCalories, sumMealMacros } from '@/lib/domain';
 import { getItem, KEYS, setItem } from '@/lib/storage';
 import { getScopedKey } from '@/lib/accounts';
+import { isFreshData } from '@/lib/staleness';
 
 interface MealState {
   meals: MealLog[];
+  lastFetchedAt: number;
   loadMeals: () => void;
   addMeal: (meal: MealLog) => void;
   updateMeal: (meal: MealLog) => void;
@@ -53,8 +55,10 @@ function mergeMeals(localMeals: MealLog[], serverMeals: MealLog[]) {
 
 export const useMealStore = create<MealState>((set, get) => ({
   meals: [],
+  lastFetchedAt: 0,
 
   loadMeals: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const storageKey = getScopedKey(KEYS.MEALS);
     const localMeals = sortMeals(getItem<MealLog[]>(storageKey, []).map(normalizeMeal));
     set({ meals: localMeals });
@@ -68,7 +72,7 @@ export const useMealStore = create<MealState>((set, get) => ({
       const currentLocalMeals = getItem<MealLog[]>(storageKey, []).map(normalizeMeal);
       const merged = mergeMeals(currentLocalMeals, serverMeals);
       setItem(storageKey, merged);
-      set({ meals: merged });
+      set({ meals: merged, lastFetchedAt: Date.now() });
     }).catch((error) => {
       console.error('Failed to load meals from server:', error);
     });
@@ -79,7 +83,7 @@ export const useMealStore = create<MealState>((set, get) => ({
     const meals = sortMeals([...get().meals, nextMeal]);
 
     // 立即更新状态并保存到 localStorage
-    set({ meals });
+    set({ meals, lastFetchedAt: Date.now() });
     try {
       setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {
@@ -107,7 +111,7 @@ export const useMealStore = create<MealState>((set, get) => ({
     const meals = sortMeals(get().meals.map(item => item.id === nextMeal.id ? nextMeal : item));
 
     // 立即更新状态并保存到 localStorage
-    set({ meals });
+    set({ meals, lastFetchedAt: Date.now() });
     try {
       setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {
@@ -126,7 +130,7 @@ export const useMealStore = create<MealState>((set, get) => ({
     const meals = get().meals.filter(meal => meal.id !== id);
 
     // 立即更新状态并保存到 localStorage
-    set({ meals });
+    set({ meals, lastFetchedAt: Date.now() });
     try {
       setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {

@@ -4,12 +4,14 @@ import { buildWeightPrediction } from '@/lib/weight-prediction-core';
 import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
 import { getScopedKey } from '@/lib/accounts';
 import { getItem, KEYS, setItem } from '@/lib/storage';
+import { isFreshData } from '@/lib/staleness';
 
 interface WeightPredictionState {
   predictions: WeightPredictionResult[];
   latestPrediction: WeightPredictionResult | null;
   isLoading: boolean;
   error: string;
+  lastFetchedAt: number;
   loadPredictions: () => void;
   generatePrediction: () => Promise<WeightPredictionResult | null>;
 }
@@ -33,8 +35,10 @@ export const useWeightPredictionStore = create<WeightPredictionState>((set, get)
   latestPrediction: null,
   isLoading: false,
   error: '',
+  lastFetchedAt: 0,
 
   loadPredictions: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const local = sortPredictions(getItem<WeightPredictionResult[]>(getScopedKey(KEYS.WEIGHT_PREDICTIONS), []));
     set({ predictions: local, latestPrediction: local[0] || null, error: '' });
 
@@ -45,7 +49,7 @@ export const useWeightPredictionStore = create<WeightPredictionState>((set, get)
     void getJson<{ predictions: WeightPredictionResult[] }>(`/api/weight-predictions?userId=${encodeURIComponent(userId)}&latest=false&limit=10`).then((data) => {
       if (data?.predictions) {
         const predictions = savePredictions(data.predictions);
-        set({ predictions, latestPrediction: predictions[0] || null });
+        set({ predictions, latestPrediction: predictions[0] || null, lastFetchedAt: Date.now() });
       }
       set({ isLoading: false });
     });

@@ -3,13 +3,16 @@ import { getJson } from '@/lib/client-api';
 import { DailyReport, DayPlan, MealLog, UserProfile, WeightEntry } from '@/lib/types';
 import { calculateMealCalories } from '@/lib/domain';
 import { getScopedKey } from '@/lib/accounts';
-import { getItem, KEYS, setItem } from '@/lib/storage';
+import { getItem, KEYS } from '@/lib/storage';
+import { writeDailyReportsCache } from '@/lib/report-cache';
+import { isFreshData } from '@/lib/staleness';
 
 interface DailyReportState {
   reports: DailyReport[];
   latestReport: DailyReport | null;
   isLoading: boolean;
   error: string;
+  lastFetchedAt: number;
   loadReports: () => void;
   ensureLatestReport: () => void;
   generateReport: (date?: string, force?: boolean) => Promise<DailyReport | null>;
@@ -36,9 +39,9 @@ function sortReports(reports: DailyReport[]) {
 }
 
 function setReportState(set: (state: Partial<DailyReportState>) => void, reports: DailyReport[]) {
-  const sorted = sortReports(reports);
-  setItem(getScopedKey(KEYS.DAILY_REPORTS), sorted);
-  set({ reports: sorted, latestReport: sorted[0] || null });
+  // Merging write: the inbox store shares this cache key with a longer list.
+  const merged = writeDailyReportsCache(reports);
+  set({ reports: merged, latestReport: merged[0] || null, lastFetchedAt: Date.now() });
 }
 
 export const useDailyReportStore = create<DailyReportState>((set, get) => ({
@@ -46,8 +49,10 @@ export const useDailyReportStore = create<DailyReportState>((set, get) => ({
   latestReport: null,
   isLoading: false,
   error: '',
+  lastFetchedAt: 0,
 
   loadReports: () => {
+    if (isFreshData(get().lastFetchedAt)) return;
     const localReports = sortReports(getItem<DailyReport[]>(getScopedKey(KEYS.DAILY_REPORTS), []));
     set({ reports: localReports, latestReport: localReports[0] || null, error: '' });
 
