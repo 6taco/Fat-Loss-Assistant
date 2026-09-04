@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Scale,
   Settings,
+  Trophy,
   Share2,
   Sparkles,
   Utensils,
@@ -24,7 +25,7 @@ import { track } from '@/lib/analytics/client';
 import { clearLocalAppData, downloadLocalAppData } from '@/lib/app-data';
 import { getActiveAccount, getScopedKey } from '@/lib/accounts';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { getItem, KEYS } from '@/lib/storage';
+import { getItem, setItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useReportInboxStore } from '@/stores/useReportInboxStore';
@@ -56,7 +57,7 @@ export default function DashboardPage() {
   const { entries: weightEntries, loadEntries, addEntry } = useWeightStore();
   const { loadMeals, getDailySummary } = useMealStore();
   const { dailyReports, weeklyReports, isLoading: reportsLoading, loadReports, generateWeeklyReport, markRead } = useReportInboxStore();
-  const { currentStrategy, recommendation, proposals: strategyProposals, executionRate, loadCurrent: loadStrategy, recheck: recheckStrategy, isLoading: strategyLoading } = useStrategyStore();
+  const { currentStrategy, recommendation, proposals: strategyProposals, executionRate, loadCurrent: loadStrategy, recheck: recheckStrategy, pauseStrategy, isLoading: strategyLoading } = useStrategyStore();
   const isLoading = reportsLoading || strategyLoading;
   const [showWeightInput, setShowWeightInput] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -65,6 +66,8 @@ export default function DashboardPage() {
   const [weightValue, setWeightValue] = useState('');
   const [weightDate, setWeightDate] = useState(todayIso);
   const [justCompleted, setJustCompleted] = useState(false);
+  // null = not checked yet; a number = the goalWeight already celebrated.
+  const [celebratedGoal, setCelebratedGoal] = useState<number | null>(null);
 
   useEffect(() => {
     const activeAccount = getActiveAccount();
@@ -82,6 +85,13 @@ export default function DashboardPage() {
     loadMeals();
     loadReports();
     loadStrategy();
+    // Deferred like the other loads: localStorage is not available during
+    // prerender and synchronous setState in an effect cascades renders.
+    const timer = window.setTimeout(() => {
+      const saved = getItem<{ goalWeight: number } | null>(getScopedKey(KEYS.GOAL_CELEBRATED), null);
+      setCelebratedGoal(saved?.goalWeight ?? -1);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [loadUser, loadPlans, loadEntries, loadMeals, loadReports, loadStrategy, router]);
 
   useEffect(() => {
@@ -100,6 +110,28 @@ export default function DashboardPage() {
   const latestWeight = chartEntries[chartEntries.length - 1];
   const dayCount = Math.max(1, Math.floor((new Date(todayIso).getTime() - new Date(profile?.startDate || todayIso).getTime()) / 86400000) + 1);
   const hasUnreadReports = dailyReports.some(report => !report.readAt) || weeklyReports.some(report => !report.readAt);
+
+  // Goal reached: latest weight at or below the goal, celebrated once per
+  // goal value (a new goal set later re-arms the celebration).
+  const goalAchieved = Boolean(profile && latestWeight && latestWeight.weight <= profile.goalWeight);
+  const showGoalModal = goalAchieved && profile != null && celebratedGoal !== null && celebratedGoal !== profile.goalWeight;
+
+  const markGoalCelebrated = () => {
+    if (!profile) return;
+    setItem(getScopedKey(KEYS.GOAL_CELEBRATED), { goalWeight: profile.goalWeight, celebratedAt: new Date().toISOString() });
+    setCelebratedGoal(profile.goalWeight);
+  };
+
+  const enterMaintenance = async () => {
+    markGoalCelebrated();
+    const paused = await pauseStrategy();
+    showAppToast(
+      paused
+        ? '已进入维持期：当前策略已暂停，热量逐步回到维持水平，每周称重 1-2 次监测反弹。'
+        : '策略暂停失败，可稍后在首页点「重新评估」重试。',
+      paused ? 'success' : 'error',
+    );
+  };
 
   const saveWeight = () => {
     const weight = Number.parseFloat(weightValue);
@@ -324,6 +356,54 @@ export default function DashboardPage() {
             </button>
             <button onClick={saveWeight} className="flex-1 py-3 rounded-xl gradient-accent text-white text-[14px] font-medium cursor-pointer border-none">
               保存
+            </button>
+          </div>
+        </ModalBackdrop>
+      )}
+
+      {showGoalModal && profile && latestWeight && (
+        <ModalBackdrop onClose={markGoalCelebrated} maxWidth="max-w-[360px]">
+          <div className="flex flex-col items-center text-center mb-4">
+            <div className="w-14 h-14 rounded-2xl gradient-accent flex items-center justify-center mb-3">
+              <Trophy size={24} className="text-white" />
+            </div>
+            <p className="text-[17px] font-semibold">恭喜，达到目标体重！</p>
+            <p className="text-[12px] text-text-tertiary mt-1">这是长期坚持的结果，值得停下来确认一下。</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <GoalStat label="起始体重" value={`${(weights[0]?.weight ?? profile.weight).toFixed(1)}kg`} />
+            <GoalStat label="当前体重" value={`${latestWeight.weight.toFixed(1)}kg`} />
+            <GoalStat label="累计减重" value={`${((weights[0]?.weight ?? profile.weight) - latestWeight.weight).toFixed(1)}kg`} sub={`第 ${dayCount} 天`} />
+          </div>
+          <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3 mb-4">
+            <p className="text-[12px] font-semibold mb-2">如果进入维持期</p>
+            <ul className="text-[11px] text-text-secondary leading-relaxed list-disc pl-4 space-y-1">
+              <li>热量逐步回到维持水平，每周上调 100-200 kcal 更稳。</li>
+              <li>每周固定称重 1-2 次监测反弹，1-2kg 内波动属正常。</li>
+              <li>保持蛋白质和训练频率，维持 2-4 周后再决定是否开启下一轮。</li>
+            </ul>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button onClick={() => void enterMaintenance()} className="py-3 rounded-xl gradient-accent text-white text-[14px] font-medium cursor-pointer border-none">
+              进入维持期，暂停当前策略
+            </button>
+            <button
+              onClick={() => {
+                markGoalCelebrated();
+                showAppToast('继续按当前计划执行，加油！', 'success');
+              }}
+              className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer"
+            >
+              继续当前计划
+            </button>
+            <button
+              onClick={() => {
+                markGoalCelebrated();
+                router.push('/onboarding?edit=1');
+              }}
+              className="py-2 bg-transparent border-none text-[12px] text-accent-blue cursor-pointer"
+            >
+              设定新的目标体重
             </button>
           </div>
         </ModalBackdrop>
@@ -691,6 +771,16 @@ function mergeInitialWeight(user: UserProfile, entries: WeightEntry[]): WeightEn
   entries.forEach(entry => byDate.set(entry.date, entry));
   byDate.set(initialEntry.date, initialEntry);
   return Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function GoalStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl bg-white/[0.045] border border-white/10 px-2 py-2.5 text-center">
+      <p className="text-[10px] text-text-tertiary mb-1">{label}</p>
+      <p className="text-[14px] font-semibold">{value}</p>
+      {sub && <p className="text-[9px] text-text-tertiary mt-0.5">{sub}</p>}
+    </div>
+  );
 }
 
 function IntakeStat({ label, current, target, color }: { label: string; current: number; target: number; color: string }) {

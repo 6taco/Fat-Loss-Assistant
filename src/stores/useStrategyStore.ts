@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { track } from '@/lib/analytics/client';
 import { getScopedKey } from '@/lib/accounts';
 import { getJson, sendJson } from '@/lib/client-api';
-import { getItem, KEYS, setItem } from '@/lib/storage';
+import { getItem, KEYS, removeItem, setItem } from '@/lib/storage';
 import { isFreshData } from '@/lib/staleness';
 import type {
   ActiveStrategy,
@@ -25,6 +25,7 @@ interface StrategyState {
   recommend: (profile?: Partial<UserLifestyleProfile>) => Promise<StrategyRecommendation | null>;
   activate: (strategyType?: StrategyRecommendation['strategyType']) => Promise<(StrategyCurrentResponse & { plans?: unknown[] }) | null>;
   recheck: () => Promise<void>;
+  pauseStrategy: () => Promise<boolean>;
 }
 
 function getLocalUserId() {
@@ -150,5 +151,21 @@ export const useStrategyStore = create<StrategyState>((set, get) => ({
     // Reset the staleness stamp so loadCurrent actually refetches the result.
     set({ isLoading: false, lastFetchedAt: 0 });
     get().loadCurrent();
+  },
+
+  pauseStrategy: async () => {
+    const userId = getLocalUserId();
+    if (!userId) return false;
+    set({ isLoading: true, error: '' });
+    const data = await sendJson<{ paused: number }>('/api/strategy/pause', 'POST', { userId });
+    if (!data) {
+      set({ isLoading: false, error: '维持期切换失败，请稍后再试。' });
+      return false;
+    }
+    removeItem(getScopedKey(KEYS.STRATEGY));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event('strategy-cache-change'));
+    set({ currentStrategy: null, proposals: [], executionRate: 0, isLoading: false, lastFetchedAt: 0 });
+    get().loadCurrent();
+    return true;
   },
 }));

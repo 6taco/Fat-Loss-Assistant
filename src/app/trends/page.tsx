@@ -184,6 +184,7 @@ export default function TrendsPage() {
         prediction={latestPrediction}
         history={mergedWeightEntries}
         goalWeight={u.goalWeight}
+        goalAchieved={Boolean(mergedWeightEntries.length && mergedWeightEntries[mergedWeightEntries.length - 1].weight <= u.goalWeight)}
         isLoading={predictionLoading}
         error={predictionError}
         onGenerate={() => void generatePrediction()}
@@ -277,6 +278,7 @@ function WeightPredictionCard({
   prediction,
   history,
   goalWeight,
+  goalAchieved,
   isLoading,
   error,
   onGenerate,
@@ -284,13 +286,18 @@ function WeightPredictionCard({
   prediction: WeightPredictionResult | null;
   history: WeightEntry[];
   goalWeight: number;
+  goalAchieved: boolean;
   isLoading: boolean;
   error: string;
   onGenerate: () => void;
 }) {
   const canPredict = history.length >= 3;
   const ready = prediction?.status === 'ready';
-  const statusText = prediction ? getPredictionStatusText(prediction) : '根据体重记录和热量执行，生成未来 30 天趋势。';
+  const statusText = goalAchieved
+    ? `你已经达到目标体重 ${goalWeight}kg。可以进入维持期，或设定新的目标。`
+    : prediction
+      ? getPredictionStatusText(prediction)
+      : '根据体重记录和热量执行，生成未来 30 天趋势。';
   const actionText = isLoading ? '生成中' : ready ? '重新生成' : '生成预测';
   const actionDisabled = isLoading || !canPredict;
 
@@ -301,6 +308,9 @@ function WeightPredictionCard({
           <div className="flex items-center gap-2 mb-1">
             <Activity size={14} className="text-accent-blue" />
             <span className="text-[13px] font-medium">AI 体重预测</span>
+            {goalAchieved && (
+              <span className="rounded-full bg-[#F3F8ED] px-2 py-0.5 text-[10px] font-semibold text-carb-low">已达标</span>
+            )}
           </div>
           <p className="text-[11px] text-text-tertiary leading-relaxed">{statusText}</p>
         </div>
@@ -326,10 +336,10 @@ function WeightPredictionCard({
         <>
           <div className="grid grid-cols-3 gap-2 mb-4">
             <PredictionMetric
-              label="预计达标"
-              value={prediction?.estimatedDaysToGoal ? `${prediction.estimatedDaysToGoal}` : '--'}
-              unit={prediction?.estimatedDaysToGoal ? '天' : ''}
-              tone="blue"
+              label={goalAchieved ? '目标' : '预计达标'}
+              value={goalAchieved ? '已达成' : prediction?.estimatedDaysToGoal ? `${prediction.estimatedDaysToGoal}` : '--'}
+              unit={goalAchieved || !prediction?.estimatedDaysToGoal ? '' : '天'}
+              tone={goalAchieved ? 'green' : 'blue'}
             />
             <PredictionMetric
               label="达标概率"

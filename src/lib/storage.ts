@@ -61,4 +61,5 @@ export const KEYS = {
   ACTIVE_ACCOUNT_ID: 'fla_active_account_id',
   COACH_PREFERENCE: 'fla_coach_preference',
   REMINDERS: 'fla_reminders',
+  GOAL_CELEBRATED: 'fla_goal_celebrated',
 } as const;
