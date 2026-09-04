@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Camera, Pencil, Plus, RotateCcw, Trash2, Utensils, X } from 'lucide-react';
+import { Bot, Camera, Pencil, Plus, Repeat, RotateCcw, Trash2, Utensils, X } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import GlassCard from '@/components/ui/GlassCard';
 import ProgressBar from '@/components/ui/ProgressBar';
@@ -37,9 +37,10 @@ interface EstimateResponse {
 
 export default function MealsPage() {
   const { user } = useUserStore();
-  const { meals, loadMeals, addMeal, deleteMeal } = useMealStore();
+  const { meals, loadMeals, addMeal, updateMeal, deleteMeal } = useMealStore();
   const { plans, loadPlans } = usePlanStore();
   const [mealType, setMealType] = useState<MealType>('breakfast');
+  const [entryDate, setEntryDate] = useState<string>(() => getTodayIso());
   const [description, setDescription] = useState('');
   const [items, setItems] = useState<FoodItem[]>([]);
   const [carb, setCarb] = useState(0);
@@ -54,6 +55,7 @@ export default function MealsPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [editMode, setEditMode] = useState(false);
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   // 在组件内部计算今天的日期，确保每次渲染都是最新的
@@ -73,17 +75,15 @@ export default function MealsPage() {
     };
   }, [photoPreviewUrl]);
 
-  const todayMeals = useMemo(() => {
-    console.log('[MealsPage] todayIso:', todayIso);
-    console.log('[MealsPage] Total meals:', meals.length);
-    console.log('[MealsPage] All meal dates:', meals.map(m => m.date));
-    const filtered = meals.filter(meal => meal.date === todayIso);
-    console.log('[MealsPage] Filtered today meals:', filtered.length);
-    return filtered;
-  }, [meals, todayIso]);
+  const todayMeals = useMemo(() => meals.filter(meal => meal.date === todayIso), [meals, todayIso]);
   const summary = useMemo(() => sumMealMacros(todayMeals), [todayMeals]);
-  const todayMealGroups = useMemo(() => groupMealsByType(todayMeals), [todayMeals]);
   const todayPlan = plans.find(plan => plan.date === todayIso);
+  // The meal list follows the selected entry date so backfilled days are
+  // visible right after saving.
+  const selectedDayMeals = useMemo(() => meals.filter(meal => meal.date === entryDate), [meals, entryDate]);
+  const selectedDayGroups = useMemo(() => groupMealsByType(selectedDayMeals), [selectedDayMeals]);
+  const isBackfilling = entryDate !== todayIso;
+  const editingMeal = editingMealId ? meals.find(meal => meal.id === editingMealId) : undefined;
   const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0 || calories > 0);
   const isWorking = isEstimating || isRecognizingPhoto;
 
@@ -221,27 +221,7 @@ export default function MealsPage() {
     setCalories(Math.round(totals.calories));
   };
 
-  const saveMeal = () => {
-    if (!canSave) {
-      showAppToast('请确认食物描述和至少一项营养数据。', 'error');
-      return;
-    }
-
-    const meal: MealLog = {
-      id: `meal-${Date.now()}`,
-      date: todayIso,
-      mealType,
-      description: description.trim(),
-      items,
-      carb,
-      protein,
-      fat,
-      calories: calories || calculateMealCalories({ carb, protein, fat }),
-      source: items.length ? 'ai' : 'manual',
-      createdAt: new Date().toISOString(),
-    };
-
-    addMeal(meal);
+  const resetForm = () => {
     setDescription('');
     setItems([]);
     setCarb(0);
@@ -251,8 +231,78 @@ export default function MealsPage() {
     setConfidence(undefined);
     setWarnings([]);
     setEditMode(false);
+    setEditingMealId(null);
     clearPhoto();
-    showAppToast('饮食记录已保存。', 'success');
+  };
+
+  const loadMealIntoForm = (meal: MealLog) => {
+    setMealType(meal.mealType);
+    setDescription(meal.description);
+    setItems(meal.items || []);
+    setCarb(meal.carb);
+    setProtein(meal.protein);
+    setFat(meal.fat);
+    setCalories(meal.calories ?? calculateMealCalories(meal));
+    setConfidence(undefined);
+    setWarnings([]);
+    setEditMode(true);
+  };
+
+  const startEditMeal = (meal: MealLog) => {
+    setEditingMealId(meal.id);
+    setEntryDate(meal.date);
+    loadMealIntoForm(meal);
+    showAppToast('已载入这条记录，修改后保存。');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // "再吃一次"：把历史餐食载入表单，日期回到今天，确认后另存为新记录。
+  const reuseMeal = (meal: MealLog) => {
+    setEditingMealId(null);
+    setEntryDate(todayIso);
+    loadMealIntoForm(meal);
+    showAppToast('已载入这一餐，确认后保存为今天的新记录。');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const saveMeal = () => {
+    if (!canSave) {
+      showAppToast('请确认食物描述和至少一项营养数据。', 'error');
+      return;
+    }
+
+    if (editingMeal) {
+      updateMeal({
+        ...editingMeal,
+        date: entryDate,
+        mealType,
+        description: description.trim(),
+        items,
+        carb,
+        protein,
+        fat,
+        calories: calories || calculateMealCalories({ carb, protein, fat }),
+      });
+      showAppToast('饮食记录已更新。', 'success');
+    } else {
+      const meal: MealLog = {
+        id: `meal-${Date.now()}`,
+        date: entryDate,
+        mealType,
+        description: description.trim(),
+        items,
+        carb,
+        protein,
+        fat,
+        calories: calories || calculateMealCalories({ carb, protein, fat }),
+        source: items.length ? 'ai' : 'manual',
+        createdAt: new Date().toISOString(),
+      };
+
+      addMeal(meal);
+      showAppToast(isBackfilling ? `已补录到 ${entryDate}。` : '饮食记录已保存。', 'success');
+    }
+    resetForm();
   };
 
   return (
@@ -295,11 +345,13 @@ export default function MealsPage() {
               <Plus size={17} strokeWidth={2.4} />
             </span>
             <div className="min-w-0">
-              <p className="text-[15px] font-semibold">记录一餐</p>
-              <p className="mt-1 text-[11px] text-text-tertiary">选择餐次，快速补充今天的摄入</p>
+              <p className="text-[15px] font-semibold">{editingMealId ? '编辑这条记录' : '记录一餐'}</p>
+              <p className="mt-1 text-[11px] text-text-tertiary">{editingMealId ? '修改后保存，原有记录会被更新' : '选择餐次和日期，快速补充摄入'}</p>
             </div>
           </div>
-          <span className="shrink-0 rounded-full bg-[#F3F8ED] px-2.5 py-1 text-[10px] font-medium text-carb-low">今日</span>
+          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-medium ${isBackfilling ? 'bg-[#FFF7EB] text-[#C8873D]' : 'bg-[#F3F8ED] text-carb-low'}`}>
+            {isBackfilling ? `补录 ${entryDate.slice(5).replace('-', '/')}` : '今日'}
+          </span>
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-1 rounded-xl bg-[#FAFBF7] p-1">
@@ -314,6 +366,19 @@ export default function MealsPage() {
               {mealTypeLabels[type]}
             </button>
           ))}
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <label htmlFor="meal-date" className="text-[11px] text-text-tertiary shrink-0">记录日期</label>
+          <input
+            id="meal-date"
+            type="date"
+            value={entryDate}
+            max={todayIso}
+            onChange={(event) => setEntryDate(event.target.value || todayIso)}
+            className="flex-1 rounded-lg border border-border-glass bg-[#FAFBF7] px-3 py-2 text-[12px] text-text-primary outline-none transition-colors focus:border-accent-blue/45 focus:bg-white"
+          />
+          <span className="text-[10px] text-text-tertiary shrink-0">{isBackfilling ? '补录过去的日期' : '可改日期补录'}</span>
         </div>
 
         <input
@@ -406,14 +471,28 @@ export default function MealsPage() {
               <MacroInput label="蛋白" value={protein} unit="g" onChange={setProtein} />
               <MacroInput label="脂肪" value={fat} unit="g" onChange={setFat} />
             </div>
-            <Button fullWidth onClick={saveMeal}>确认并写入饮食记录</Button>
+            {editingMealId ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="secondary" onClick={() => { resetForm(); setEntryDate(todayIso); }}>取消编辑</Button>
+                <Button onClick={saveMeal}>保存修改</Button>
+              </div>
+            ) : (
+              <Button fullWidth onClick={saveMeal}>{isBackfilling ? `补录到 ${entryDate}` : '确认并写入饮食记录'}</Button>
+            )}
           </motion.div>
         )}
       </GlassCard>
 
-      <p className="text-[13px] text-text-secondary font-medium mb-3">今日餐次</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[13px] text-text-secondary font-medium">{isBackfilling ? `${entryDate} 的餐次` : '今日餐次'}</p>
+        {isBackfilling && (
+          <button onClick={() => setEntryDate(todayIso)} className="text-[11px] text-accent-blue cursor-pointer bg-transparent border-none">
+            回到今天
+          </button>
+        )}
+      </div>
       <div className="flex flex-col gap-2.5">
-        {todayMealGroups.length > 0 ? todayMealGroups.map(group => (
+        {selectedDayGroups.length > 0 ? selectedDayGroups.map(group => (
           <GlassCard key={group.mealType} padding="px-4 py-3">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
@@ -433,16 +512,24 @@ export default function MealsPage() {
                     <p className="text-[12px] text-text-secondary line-clamp-2">{meal.description}</p>
                     <p className="text-[10px] text-text-tertiary mt-1">{meal.calories ?? calculateMealCalories(meal)} kcal</p>
                   </div>
-                  <button onClick={() => deleteMeal(meal.id)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center shrink-0" aria-label="删除">
-                    <Trash2 size={14} className="text-text-tertiary" />
-                  </button>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => startEditMeal(meal)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center" aria-label="编辑这条记录" title="编辑">
+                      <Pencil size={13} className="text-text-secondary" />
+                    </button>
+                    <button onClick={() => reuseMeal(meal)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center" aria-label="再吃一次" title="再吃一次">
+                      <Repeat size={13} className="text-text-secondary" />
+                    </button>
+                    <button onClick={() => deleteMeal(meal.id)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center" aria-label="删除" title="删除">
+                      <Trash2 size={14} className="text-text-tertiary" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           </GlassCard>
         )) : (
           <GlassCard padding="p-5" className="text-center">
-            <p className="text-[14px] font-medium mb-1">今天还没有饮食记录</p>
+            <p className="text-[14px] font-medium mb-1">{isBackfilling ? `${entryDate} 没有饮食记录` : '今天还没有饮食记录'}</p>
             <p className="text-[12px] text-text-tertiary">从上方拍照或输入一餐，保存后这里会显示实际摄入。</p>
           </GlassCard>
         )}

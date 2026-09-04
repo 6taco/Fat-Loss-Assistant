@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const [showInbox, setShowInbox] = useState(false);
   const [selectedReport, setSelectedReport] = useState<{ type: 'daily'; report: DailyReport } | { type: 'weekly'; report: WeeklyReport } | null>(null);
   const [weightValue, setWeightValue] = useState('');
+  const [weightDate, setWeightDate] = useState(todayIso);
   const [justCompleted, setJustCompleted] = useState(false);
 
   useEffect(() => {
@@ -107,10 +108,10 @@ export default function DashboardPage() {
       return;
     }
 
-    addEntry({ date: todayIso, weight });
+    addEntry({ date: weightDate, weight });
     setShowWeightInput(false);
     setWeightValue('');
-    showAppToast('体重已保存。', 'success');
+    showAppToast(weightDate === todayIso ? '体重已保存。' : `体重已补录到 ${weightDate}。`, 'success');
   };
 
   // Honest state while the profile is unavailable: never render demo data.
@@ -272,7 +273,7 @@ export default function DashboardPage() {
       <WeightTrendCard entries={chartEntries} fallbackWeight={profile.weight} />
 
       <div className="grid grid-cols-3 gap-3 relative z-10">
-        <ActionCard icon={Scale} label="记体重" color="#68B96C" onClick={() => setShowWeightInput(true)} />
+        <ActionCard icon={Scale} label="记体重" color="#68B96C" onClick={() => { setWeightDate(todayIso); setShowWeightInput(true); }} />
         <ActionCard icon={MessageSquare} label="问 AI" color="#F0B56E" onClick={() => router.push('/chat')} />
         <ActionCard
           icon={CheckCircle2}
@@ -292,7 +293,18 @@ export default function DashboardPage() {
 
       {showWeightInput && (
         <ModalBackdrop onClose={() => setShowWeightInput(false)}>
-          <p className="text-[16px] font-semibold mb-4">记录今日体重</p>
+          <p className="text-[16px] font-semibold mb-4">记录体重</p>
+          <div className="flex items-center gap-2 mb-3">
+            <label htmlFor="weight-date" className="text-[12px] text-text-tertiary shrink-0">称重日期</label>
+            <input
+              id="weight-date"
+              type="date"
+              value={weightDate}
+              max={todayIso}
+              onChange={(event) => setWeightDate(event.target.value || todayIso)}
+              className="flex-1 bg-transparent border border-border-glass rounded-xl px-3 py-2 text-[13px] text-text-primary outline-none focus:border-accent-blue transition-colors"
+            />
+          </div>
           <div className="flex items-center gap-2 mb-5">
             <input
               type="number"
@@ -305,6 +317,7 @@ export default function DashboardPage() {
             />
             <span className="text-[14px] text-text-tertiary">kg</span>
           </div>
+          <p className="text-[11px] text-text-tertiary mb-4">同一天多次记录会覆盖，补录过去的日期可用于补全趋势。</p>
           <div className="flex gap-3">
             <button onClick={() => setShowWeightInput(false)} className="flex-1 py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer">
               取消

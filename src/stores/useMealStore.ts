@@ -56,34 +56,17 @@ export const useMealStore = create<MealState>((set, get) => ({
 
   loadMeals: () => {
     const storageKey = getScopedKey(KEYS.MEALS);
-    console.log('[loadMeals] Storage key:', storageKey);
-
     const localMeals = sortMeals(getItem<MealLog[]>(storageKey, []).map(normalizeMeal));
-    console.log('[loadMeals] Loaded from localStorage:', localMeals.length, 'meals');
-    console.log('[loadMeals] Meal dates:', localMeals.map(m => ({ id: m.id, date: m.date })));
-
     set({ meals: localMeals });
 
     const userId = getLocalUserId();
-    console.log('[loadMeals] User ID:', userId);
-
     if (!userId) return;
 
     void getJson<{ meals: MealLog[] }>(`/api/meal-logs?userId=${encodeURIComponent(userId)}`).then((data) => {
       if (!data?.meals) return;
-
-      console.log('[loadMeals] Server response:', data.meals);
-      console.log('[loadMeals] Server meal dates (raw):', data.meals.map(m => ({ id: m.id, date: m.date })));
-
       const serverMeals = data.meals.map(normalizeMeal);
-      console.log('[loadMeals] After normalize:', serverMeals.map(m => ({ id: m.id, date: m.date })));
-
       const currentLocalMeals = getItem<MealLog[]>(storageKey, []).map(normalizeMeal);
-      console.log('[loadMeals] Current local before merge:', currentLocalMeals.map(m => ({ id: m.id, date: m.date })));
-
       const merged = mergeMeals(currentLocalMeals, serverMeals);
-      console.log('[loadMeals] After merge:', merged.map(m => ({ id: m.id, date: m.date })));
-
       setItem(storageKey, merged);
       set({ meals: merged });
     }).catch((error) => {
@@ -93,32 +76,17 @@ export const useMealStore = create<MealState>((set, get) => ({
 
   addMeal: (meal) => {
     const nextMeal = normalizeMeal(meal);
-    console.log('[addMeal] Adding meal:', { id: nextMeal.id, date: nextMeal.date, description: nextMeal.description });
-
     const meals = sortMeals([...get().meals, nextMeal]);
-    console.log('[addMeal] Total meals after add:', meals.length);
 
-    // 立即更新状态
+    // 立即更新状态并保存到 localStorage
     set({ meals });
-
-    // 保存到localStorage
-    const storageKey = getScopedKey(KEYS.MEALS);
-    console.log('[addMeal] Saving to localStorage with key:', storageKey);
-
     try {
-      setItem(storageKey, meals);
-      console.log('[addMeal] Saved successfully');
-
-      // 验证保存
-      const verification = getItem<MealLog[]>(storageKey, []);
-      console.log('[addMeal] Verification: localStorage now has', verification.length, 'meals');
+      setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {
       console.error('Failed to save meal to localStorage:', error);
     }
 
     const userId = getLocalUserId();
-    console.log('[addMeal] User ID:', userId);
-
     track('meal_log_create', {
       date: nextMeal.date,
       meal_type: nextMeal.mealType,
@@ -128,9 +96,7 @@ export const useMealStore = create<MealState>((set, get) => ({
 
     // 异步保存到服务器
     if (userId) {
-      void sendJson('/api/meal-logs', 'POST', { ...nextMeal, userId }).then(() => {
-        console.log('[addMeal] Saved to server successfully');
-      }).catch((error) => {
+      void sendJson('/api/meal-logs', 'POST', { ...nextMeal, userId }).catch((error) => {
         console.error('Failed to save meal to server:', error);
       });
     }
@@ -140,10 +106,8 @@ export const useMealStore = create<MealState>((set, get) => ({
     const nextMeal = normalizeMeal({ ...meal, updatedAt: new Date().toISOString() });
     const meals = sortMeals(get().meals.map(item => item.id === nextMeal.id ? nextMeal : item));
 
-    // 立即更新状态
+    // 立即更新状态并保存到 localStorage
     set({ meals });
-
-    // 保存到localStorage
     try {
       setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {
@@ -161,10 +125,8 @@ export const useMealStore = create<MealState>((set, get) => ({
   deleteMeal: (id) => {
     const meals = get().meals.filter(meal => meal.id !== id);
 
-    // 立即更新状态
+    // 立即更新状态并保存到 localStorage
     set({ meals });
-
-    // 保存到localStorage
     try {
       setItem(getScopedKey(KEYS.MEALS), meals);
     } catch (error) {
