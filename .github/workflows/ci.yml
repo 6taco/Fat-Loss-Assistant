@@ -20,6 +20,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        # npm ci starts from a clean node_modules; typecheck runs before the
+        # build (whose prebuild would generate it), so generate up front.
+        run: npx prisma generate
+        env:
+          DATABASE_URL: mysql://ci:ci@localhost:3306/ci_placeholder
+
       - name: Test, typecheck, lint, build
         run: npm run check
         env:
