@@ -8,6 +8,7 @@ export type AnalyticsEventName =
   | 'plan_generate'
   | 'plan_complete'
   | 'weight_log_create'
+  | 'body_metric_create'
   | 'meal_log_create'
   | 'photo_upload'
   | 'daily_report_view'

@@ -11,6 +11,7 @@ import { track } from '@/lib/analytics/client';
 import { groupMealsByType } from '@/lib/meal-groups';
 import { type FoodItem, type MealLog, type MealType } from '@/lib/types';
 import { calculateMealCalories, mealTypeLabels, sumMealMacros } from '@/lib/domain';
+import { buildHistoryFoods, matchLocalEstimate } from '@/lib/food-library';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
@@ -82,6 +83,8 @@ export default function MealsPage() {
   // visible right after saving.
   const selectedDayMeals = useMemo(() => meals.filter(meal => meal.date === entryDate), [meals, entryDate]);
   const selectedDayGroups = useMemo(() => groupMealsByType(selectedDayMeals), [selectedDayMeals]);
+  // Personal food table for local-first matching and quick-pick chips.
+  const historyFoods = useMemo(() => buildHistoryFoods(meals), [meals]);
   const isBackfilling = entryDate !== todayIso;
   const editingMeal = editingMealId ? meals.find(meal => meal.id === editingMealId) : undefined;
   const canSave = description.trim().length > 0 && (carb > 0 || protein > 0 || fat > 0 || calories > 0);
@@ -103,6 +106,16 @@ export default function MealsPage() {
     const text = description.trim();
     if (!text) {
       showAppToast('请先输入这一餐吃了什么。', 'error');
+      return;
+    }
+
+    // Local-first: the built-in library plus the user's own logged items
+    // cover common meals without an AI round trip. Anything unrecognized
+    // falls through to the AI flow below.
+    const local = matchLocalEstimate(text, historyFoods);
+    if (local) {
+      applyEstimate(local);
+      showAppToast('已用本地食物库匹配（未调用 AI），请核对份量后保存。', 'success');
       return;
     }
 
@@ -451,7 +464,24 @@ export default function MealsPage() {
             placeholder="例如：米饭半碗、鸡胸肉 150g、青菜一份"
             className="min-h-[96px] w-full resize-none rounded-xl border border-border-glass bg-[#FAFBF7] px-4 py-3 text-[13px] leading-6 text-text-primary outline-none transition-colors placeholder:text-text-tertiary focus:border-accent-blue/45 focus:bg-white"
           />
-          <p className="mt-2 text-[10px] leading-relaxed text-text-tertiary">AI 会根据描述估算热量和营养素，保存前你可以随时调整结果。</p>
+          <p className="mt-2 text-[10px] leading-relaxed text-text-tertiary">常用食物会先在本地匹配（更快也更省），匹配不到时 AI 会根据描述估算，保存前你可以随时调整结果。</p>
+          {historyFoods.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[10px] text-text-tertiary mb-1.5">常吃 · 点击添加</p>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {historyFoods.slice(0, 8).map(food => (
+                  <button
+                    key={food.name}
+                    type="button"
+                    onClick={() => setDescription(prev => prev.trim() ? `${prev}、${food.name}` : food.name)}
+                    className="shrink-0 rounded-full bg-[#F3F8ED] px-3 py-1.5 text-[11px] text-carb-low border border-[#68B96C]/20 cursor-pointer active:scale-95 transition-transform"
+                  >
+                    {food.name} ×{food.count}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {editMode && (

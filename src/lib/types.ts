@@ -64,6 +64,16 @@ export interface WeightEntry {
   weight: number;
 }
 
+export interface BodyMetricEntry {
+  id: string;
+  date: string;
+  bodyFat?: number;
+  waistCm?: number;
+  hipCm?: number;
+  chestCm?: number;
+  armCm?: number;
+}
+
 export interface FoodItem {
   name: string;
   amountText?: string;

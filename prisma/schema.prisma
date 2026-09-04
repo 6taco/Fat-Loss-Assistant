@@ -105,7 +105,27 @@ model User {
   trainingPlans     TrainingPlan[]
   shoppingLists     ShoppingList[]
   notificationEvents NotificationEvent[]
+  bodyMetricEntries BodyMetricEntry[]
   authUser          AuthUser?         @relation(fields: [authUserId], references: [id], onDelete: SetNull)
+}
+
+// Daily body-composition log: body fat plus circumference measurements.
+// Weight lives in WeightEntry; these catch "scale stalled but waist dropped".
+model BodyMetricEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  bodyFat   Float?
+  waistCm   Float?
+  hipCm     Float?
+  chestCm   Float?
+  armCm     Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
 }
 
 model AuthUser {

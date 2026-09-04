@@ -2,15 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Flame, RefreshCw, Target, TrendingDown } from 'lucide-react';
+import { Activity, Flame, Plus, RefreshCw, Ruler, Target, TrendingDown, X } from 'lucide-react';
 import GlassCard from '@/components/ui/GlassCard';
 import RingChart from '@/components/ui/RingChart';
+import { showAppToast } from '@/components/ui/ToastHost';
+import { useBodyMetricStore } from '@/stores/useBodyMetricStore';
 import { useMealStore } from '@/stores/useMealStore';
 import { usePlanStore } from '@/stores/usePlanStore';
 import { useUserStore } from '@/stores/useUserStore';
 import { useWeightPredictionStore } from '@/stores/useWeightPredictionStore';
 import { useWeightStore } from '@/stores/useWeightStore';
-import { DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
+import { BodyMetricEntry, DayPlan, MealLog, UserProfile, WeightEntry, WeightPredictionResult } from '@/lib/types';
+import { getTodayIso } from '@/lib/date-utils';
 import { sumMealMacros } from '@/lib/domain';
 
 type RangeKey = '7' | '30' | '90' | 'all';
@@ -38,6 +41,9 @@ export default function TrendsPage() {
   const { entries: weightEntries, loadEntries } = useWeightStore();
   const { plans, loadPlans } = usePlanStore();
   const { meals, loadMeals } = useMealStore();
+  const { entries: bodyMetrics, loadEntries: loadBodyMetrics, saveEntry: saveBodyMetric } = useBodyMetricStore();
+  const [showBodyInput, setShowBodyInput] = useState(false);
+  const [bodyForm, setBodyForm] = useState({ date: '', bodyFat: '', waist: '', hip: '', chest: '', arm: '' });
   const {
     latestPrediction,
     isLoading: predictionLoading,
@@ -53,7 +59,44 @@ export default function TrendsPage() {
     loadPlans();
     loadMeals();
     loadPredictions();
-  }, [loadUser, loadEntries, loadPlans, loadMeals, loadPredictions]);
+    loadBodyMetrics();
+  }, [loadUser, loadEntries, loadPlans, loadMeals, loadPredictions, loadBodyMetrics]);
+
+  const openBodyInput = () => {
+    const latest = bodyMetrics[bodyMetrics.length - 1];
+    setBodyForm({
+      date: getTodayIso(),
+      bodyFat: latest?.bodyFat !== undefined ? String(latest.bodyFat) : '',
+      waist: latest?.waistCm !== undefined ? String(latest.waistCm) : '',
+      hip: latest?.hipCm !== undefined ? String(latest.hipCm) : '',
+      chest: latest?.chestCm !== undefined ? String(latest.chestCm) : '',
+      arm: latest?.armCm !== undefined ? String(latest.armCm) : '',
+    });
+    setShowBodyInput(true);
+  };
+
+  const saveBodyMetrics = () => {
+    const numberOrUndefined = (value: string) => {
+      const parsed = Number.parseFloat(value);
+      return value.trim() !== '' && Number.isFinite(parsed) ? parsed : undefined;
+    };
+    const entry = {
+      date: bodyForm.date || getTodayIso(),
+      bodyFat: numberOrUndefined(bodyForm.bodyFat),
+      waistCm: numberOrUndefined(bodyForm.waist),
+      hipCm: numberOrUndefined(bodyForm.hip),
+      chestCm: numberOrUndefined(bodyForm.chest),
+      armCm: numberOrUndefined(bodyForm.arm),
+    };
+    if (entry.bodyFat === undefined && entry.waistCm === undefined && entry.hipCm === undefined
+      && entry.chestCm === undefined && entry.armCm === undefined) {
+      showAppToast('至少填写一项身体数据。', 'error');
+      return;
+    }
+    saveBodyMetric(entry);
+    setShowBodyInput(false);
+    showAppToast('身体数据已保存。', 'success');
+  };
 
   const selectedRange = timeRanges.find(item => item.key === range) || timeRanges[0];
   const mergedWeightEntries = useMemo(() => u ? mergeInitialWeight(u, weightEntries) : weightEntries, [u, weightEntries]);
@@ -251,6 +294,116 @@ export default function TrendsPage() {
           <p className="text-[12px] text-text-tertiary">天</p>
         </GlassCard>
       </div>
+
+      <BodyMetricCard entries={bodyMetrics} onRecord={openBodyInput} />
+
+      {showBodyInput && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 px-5" onClick={() => setShowBodyInput(false)}>
+          <div className="w-full max-w-[360px] rounded-2xl bg-bg-primary p-5 shadow-xl" onClick={event => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[16px] font-semibold">记录身体数据</p>
+              <button onClick={() => setShowBodyInput(false)} className="w-8 h-8 rounded-full bg-glass flex items-center justify-center" aria-label="关闭">
+                <X size={15} className="text-text-secondary" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 mb-3">
+              <label htmlFor="body-date" className="text-[12px] text-text-tertiary shrink-0">日期</label>
+              <input
+                id="body-date"
+                type="date"
+                value={bodyForm.date}
+                max={getTodayIso()}
+                onChange={event => setBodyForm(prev => ({ ...prev, date: event.target.value }))}
+                className="flex-1 rounded-lg border border-border-glass bg-[#FAFBF7] px-3 py-2 text-[13px] text-text-primary outline-none focus:border-accent-blue/45"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <BodyMetricInput label="体脂率" unit="%" value={bodyForm.bodyFat} onChange={value => setBodyForm(prev => ({ ...prev, bodyFat: value }))} />
+              <BodyMetricInput label="腰围" unit="cm" value={bodyForm.waist} onChange={value => setBodyForm(prev => ({ ...prev, waist: value }))} />
+              <BodyMetricInput label="臀围" unit="cm" value={bodyForm.hip} onChange={value => setBodyForm(prev => ({ ...prev, hip: value }))} />
+              <BodyMetricInput label="胸围" unit="cm" value={bodyForm.chest} onChange={value => setBodyForm(prev => ({ ...prev, chest: value }))} />
+              <BodyMetricInput label="臂围" unit="cm" value={bodyForm.arm} onChange={value => setBodyForm(prev => ({ ...prev, arm: value }))} />
+            </div>
+            <p className="text-[11px] text-text-tertiary mb-4">同一日期重复保存会覆盖；留空的项保留之前记录的值。</p>
+            <button onClick={saveBodyMetrics} className="w-full py-3 rounded-xl gradient-accent text-white text-[14px] font-medium cursor-pointer border-none">
+              保存
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BodyMetricCard({ entries, onRecord }: { entries: BodyMetricEntry[]; onRecord: () => void }) {
+  const latest = entries[entries.length - 1];
+  const previous = entries[entries.length - 2];
+
+  const metrics = latest ? ([
+    { label: '体脂', value: latest.bodyFat, unit: '%', prev: previous?.bodyFat },
+    { label: '腰围', value: latest.waistCm, unit: 'cm', prev: previous?.waistCm },
+    { label: '臀围', value: latest.hipCm, unit: 'cm', prev: previous?.hipCm },
+    { label: '胸围', value: latest.chestCm, unit: 'cm', prev: previous?.chestCm },
+    { label: '臂围', value: latest.armCm, unit: 'cm', prev: previous?.armCm },
+  ] as const).filter(metric => metric.value !== undefined) : [];
+
+  return (
+    <GlassCard className="mb-3">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Ruler size={14} className="text-accent-blue" />
+            <span className="text-[13px] font-medium">体脂与围度</span>
+          </div>
+          <p className="text-[11px] text-text-tertiary leading-relaxed">
+            {latest ? `${latest.date} 记录 · 体重不动时，腰围下降也是进展` : '体重不动时，腰围下降也是进展'}
+          </p>
+        </div>
+        <button
+          onClick={onRecord}
+          className="shrink-0 h-9 px-3 rounded-full gradient-accent text-[12px] font-semibold text-white flex items-center gap-1.5 cursor-pointer border-none"
+        >
+          <Plus size={12} />
+          记录
+        </button>
+      </div>
+      {metrics.length ? (
+        <div className="grid grid-cols-3 gap-2">
+          {metrics.map(metric => {
+            const delta = metric.prev !== undefined && metric.value !== undefined ? metric.value - metric.prev : undefined;
+            const improving = delta !== undefined && delta < 0;
+            return (
+              <div key={metric.label} className="rounded-xl bg-white/[0.045] border border-white/10 px-2 py-2.5 text-center">
+                <p className="text-[10px] text-text-tertiary mb-1">{metric.label}</p>
+                <p className="text-[15px] font-semibold">{metric.value}{metric.unit}</p>
+                {delta !== undefined && Math.abs(delta) >= 0.1 && (
+                  <p className={`text-[9px] mt-0.5 ${improving ? 'text-carb-low' : delta > 0 ? 'text-carb-high' : 'text-text-tertiary'}`}>
+                    {delta > 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1)} 较上次
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[12px] text-text-tertiary py-3 text-center">还没有记录。体脂率和围度每周记一次就够，和体重趋势互相印证。</p>
+      )}
+    </GlassCard>
+  );
+}
+
+function BodyMetricInput({ label, unit, value, onChange }: { label: string; unit: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <div>
+      <label className="text-[11px] text-text-tertiary mb-1 block">{label}（{unit}，选填）</label>
+      <input
+        type="number"
+        step="0.1"
+        inputMode="decimal"
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        className="w-full rounded-lg border border-border-glass bg-[#FAFBF7] px-3 py-2 text-[13px] text-text-primary outline-none focus:border-accent-blue/45"
+      />
     </div>
   );
 }
