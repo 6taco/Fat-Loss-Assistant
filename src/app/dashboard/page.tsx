@@ -23,7 +23,7 @@ import RingChart from '@/components/ui/RingChart';
 import { showAppToast } from '@/components/ui/ToastHost';
 import { track } from '@/lib/analytics/client';
 import { clearLocalAppData, downloadLocalAppData } from '@/lib/app-data';
-import { getActiveAccount, getScopedKey } from '@/lib/accounts';
+import { getActiveAccount, getScopedKey, clearActiveAccount } from '@/lib/accounts';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { getItem, setItem, KEYS } from '@/lib/storage';
 import { useMealStore } from '@/stores/useMealStore';
@@ -66,6 +66,9 @@ export default function DashboardPage() {
   const [weightValue, setWeightValue] = useState('');
   const [weightDate, setWeightDate] = useState(todayIso);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   // null = not checked yet; a number = the goalWeight already celebrated.
   const [celebratedGoal, setCelebratedGoal] = useState<number | null>(null);
 
@@ -131,6 +134,36 @@ export default function DashboardPage() {
         : '策略暂停失败，可稍后在首页点「重新评估」重试。',
       paused ? 'success' : 'error',
     );
+  };
+
+  const deleteAccount = async () => {
+    if (!deletePassword) {
+      showAppToast('请输入当前密码确认。', 'error');
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const response = await fetch('/api/account/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'DELETE_FAILED');
+      }
+      clearLocalAppData();
+      clearActiveAccount();
+      setShowDeleteAccount(false);
+      showAppToast('账号已删除，本地数据已清除。', 'success');
+      // Full reload resets every in-memory store before landing on accounts.
+      window.setTimeout(() => window.location.replace('/accounts'), 800);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      showAppToast(code === 'INVALID_CREDENTIALS' ? '密码不正确。' : '删除失败，请稍后再试。', 'error');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const saveWeight = () => {
@@ -409,6 +442,41 @@ export default function DashboardPage() {
         </ModalBackdrop>
       )}
 
+      {showDeleteAccount && (
+        <ModalBackdrop onClose={() => setShowDeleteAccount(false)} maxWidth="max-w-[360px]">
+          <p className="text-[16px] font-semibold mb-2">删除账号</p>
+          <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-3 mb-4">
+            <p className="text-[12px] text-red-700 font-medium mb-1.5">此操作不可恢复</p>
+            <ul className="text-[11px] text-text-secondary leading-relaxed list-disc pl-4 space-y-0.5">
+              <li>云端全部数据会被永久删除：个人资料、体重/饮食/围度记录、计划与策略</li>
+              <li>AI 日报周报、教练洞察、聊天记录、数字分身数据</li>
+              <li>登录会话与账号本身；本机的本地数据也会被清空</li>
+            </ul>
+          </div>
+          <label htmlFor="delete-password" className="text-[12px] text-text-tertiary mb-1.5 block">输入当前密码确认</label>
+          <input
+            id="delete-password"
+            type="password"
+            value={deletePassword}
+            onChange={event => setDeletePassword(event.target.value)}
+            className="w-full bg-transparent border border-border-glass rounded-xl px-4 py-3 text-[15px] text-text-primary outline-none focus:border-red-400/50 transition-colors mb-4"
+            autoComplete="current-password"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => setShowDeleteAccount(false)} disabled={isDeletingAccount} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-secondary text-[14px] cursor-pointer disabled:opacity-50">
+              取消
+            </button>
+            <button
+              onClick={() => void deleteAccount()}
+              disabled={isDeletingAccount || !deletePassword}
+              className="py-3 rounded-xl bg-red-600 text-white text-[14px] font-medium cursor-pointer border-none disabled:opacity-50"
+            >
+              {isDeletingAccount ? '删除中…' : '确认永久删除'}
+            </button>
+          </div>
+        </ModalBackdrop>
+      )}
+
       {showSettings && (
         <ModalBackdrop onClose={() => setShowSettings(false)} maxWidth="max-w-[340px]">
           <p className="text-[16px] font-semibold mb-2">应用与数据</p>
@@ -474,6 +542,16 @@ export default function DashboardPage() {
               className="py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 text-[14px] cursor-pointer"
             >
               清除本地数据
+            </button>
+            <button
+              onClick={() => {
+                setShowSettings(false);
+                setDeletePassword('');
+                setShowDeleteAccount(true);
+              }}
+              className="py-3 rounded-xl border border-red-500/30 bg-red-500/10 text-red-700 text-[14px] cursor-pointer"
+            >
+              删除账号（不可恢复）
             </button>
             <button onClick={() => setShowSettings(false)} className="py-3 rounded-xl border border-border-glass bg-transparent text-text-tertiary text-[14px] cursor-pointer">
               关闭
